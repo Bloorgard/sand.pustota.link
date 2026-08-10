@@ -269,9 +269,7 @@
     let simHeight = 0;
     let sand = new Float32Array(0);
     let initialMass = 0;
-    let offscreen = document.createElement('canvas');
-    let offscreenContext = offscreen.getContext('2d', { alpha: false });
-    let imageData = null;
+
     let activePointer = null;
     let lastPoint = null;
     let strokes = [];
@@ -350,9 +348,6 @@
       simWidth = saved?.width || size.width;
       simHeight = saved?.height || size.height;
       sand = saved?.sand || createMound(simWidth, simHeight);
-      offscreen.width = simWidth;
-      offscreen.height = simHeight;
-      imageData = offscreenContext.createImageData(simWidth, simHeight);
       mark = new Uint32Array(simWidth * simHeight);
       buildRenderNoise();
       initialMass = sumMass();
@@ -545,24 +540,6 @@
       const scaleX = canvas.width / simWidth;
       const scaleY = canvas.height / simHeight;
       const unit = Math.min(scaleX, scaleY);
-      const shadowX = Math.max(2, Math.round(unit * 1.25));
-      const shadowY = Math.max(3, Math.round(unit * 1.75));
-
-      const shadowPixels = imageData.data;
-      for (let i = 0; i < sand.length; i++) {
-        const p = i * 4;
-        const alpha = sand[i] > 0.18 ? clamp(Math.round((sand[i] - 0.18) * 36), 0, 58) : 0;
-        shadowPixels[p] = 17;
-        shadowPixels[p + 1] = 17;
-        shadowPixels[p + 2] = 17;
-        shadowPixels[p + 3] = alpha;
-      }
-      offscreenContext.putImageData(imageData, 0, 0);
-      context.save();
-      context.imageSmoothingEnabled = true;
-      context.imageSmoothingQuality = 'medium';
-      context.drawImage(offscreen, shadowX, shadowY, canvas.width, canvas.height);
-      context.restore();
 
       let dotCount = 0;
 
