@@ -1,0 +1,885 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#f4f4f1">
+  <link rel="icon" href="data:,">
+  <title>sand.pustota.link</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --ink: #111111;
+      --table: #f4f4f1;
+      --glass: rgba(244, 244, 241, .84);
+      --line: rgba(17, 17, 17, .34);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      overscroll-behavior: none;
+      background: var(--table);
+      color: var(--ink);
+    }
+
+    button { font: inherit; }
+
+    #sand {
+      position: fixed;
+      inset: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: none;
+      touch-action: none;
+    }
+
+    .topbar {
+      position: fixed;
+      z-index: 3;
+      top: max(18px, env(safe-area-inset-top));
+      left: max(18px, env(safe-area-inset-left));
+      right: max(18px, env(safe-area-inset-right));
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      pointer-events: none;
+    }
+
+    .brand {
+      display: grid;
+      gap: 5px;
+      user-select: none;
+    }
+
+    .brand strong {
+      font-size: 12px;
+      line-height: 1;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      font-weight: 720;
+    }
+
+    .brand span {
+      font-size: 11px;
+      line-height: 1.35;
+      opacity: .54;
+    }
+
+    .actions {
+      display: flex;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--glass);
+      backdrop-filter: blur(9px);
+      pointer-events: auto;
+    }
+
+    .actions button {
+      min-height: 38px;
+      padding: 0 15px;
+      border: 0;
+      border-right: 1px solid var(--line);
+      color: inherit;
+      background: transparent;
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .actions button:last-child { border-right: 0; }
+    .actions button:hover, .actions button:focus-visible { background: rgba(255,255,255,.14); }
+    .actions button:focus-visible { outline: 2px solid var(--ink); outline-offset: -3px; }
+
+    .parameter-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 38px;
+      padding: 0 12px;
+      border-right: 1px solid var(--line);
+      font-size: 10px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .parameter-control input {
+      width: 82px;
+      margin: 0;
+      accent-color: var(--ink);
+      cursor: ew-resize;
+    }
+
+    .angle-value {
+      width: 30px;
+      font: 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      text-align: right;
+    }
+
+    .card-tool {
+      position: fixed;
+      z-index: 2;
+      left: 0;
+      top: 0;
+      width: 150px;
+      height: 26px;
+      border: 1px solid rgba(24, 26, 28, .68);
+      border-radius: 3px 3px 2px 2px;
+      background: linear-gradient(180deg, #f2f2ee 0%, #c8c9c7 62%, #989b9d 100%);
+      box-shadow: 0 13px 18px rgba(20, 22, 24, .24), inset 0 1px rgba(255,255,255,.72);
+      transform: translate(-50%, -50%);
+      transform-origin: 50% 50%;
+      pointer-events: none;
+      opacity: 1;
+      will-change: transform;
+    }
+
+    .card-tool.pressed { filter: brightness(.9); }
+
+    .card-tool::before {
+      content: "";
+      position: absolute;
+      left: 4px;
+      right: 4px;
+      bottom: 3px;
+      height: 2px;
+      border-radius: 1px;
+      background: rgba(26, 28, 30, .5);
+    }
+
+    .card-tool::after {
+      content: "";
+      position: absolute;
+      left: 10%;
+      right: 10%;
+      top: 5px;
+      height: 1px;
+      background: rgba(255,255,255,.56);
+    }
+
+    .hint {
+      position: fixed;
+      z-index: 3;
+      left: 50%;
+      bottom: max(25px, env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      padding: 9px 13px;
+      border: 1px solid rgba(26, 28, 30, .15);
+      border-radius: 999px;
+      background: rgba(244, 244, 241, .72);
+      backdrop-filter: blur(8px);
+      font-size: 11px;
+      letter-spacing: .04em;
+      white-space: nowrap;
+      pointer-events: none;
+      transition: opacity 450ms ease;
+    }
+
+    .hint.hidden { opacity: 0; }
+
+    .status {
+      position: fixed;
+      z-index: 3;
+      right: max(18px, env(safe-area-inset-right));
+      bottom: max(18px, env(safe-area-inset-bottom));
+      font: 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+      opacity: .46;
+      pointer-events: none;
+    }
+
+    @media (max-width: 620px) {
+      .topbar { flex-direction: column; align-items: stretch; gap: 12px; }
+      .brand span { display: none; }
+      .actions { align-self: stretch; display: grid; grid-template-columns: 1fr 1fr 1fr; border-radius: 22px; }
+      .parameter-control { grid-column: 1 / -1; min-height: 36px; padding: 0 12px; border-right: 0; border-bottom: 1px solid var(--line); }
+      .parameter-control input { flex: 1; width: auto; }
+      .actions button { min-height: 36px; padding: 0 12px; font-size: 10px; }
+
+      .status { left: max(18px, env(safe-area-inset-left)); right: auto; bottom: max(14px, env(safe-area-inset-bottom)); }
+      .hint { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 23px); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .hint { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="sand" aria-label="Пустой стол с конечной горстью песка. Зажмите и ведите скребок, чтобы придавать кучке форму."></canvas>
+
+  <header class="topbar">
+    <div class="brand">
+      <strong>sand.pustota.link</strong>
+      <span>конечная горсть · скребок 01</span>
+    </div>
+    <nav class="actions" aria-label="Действия">
+      <label class="parameter-control angle-control" for="angle">
+        <span>угол</span>
+        <input id="angle" type="range" min="0" max="180" step="1" value="45">
+        <output id="angle-value" class="angle-value" for="angle">45°</output>
+      </label>
+      <label class="parameter-control length-control" for="length">
+        <span>длина</span>
+        <input id="length" type="range" min="70" max="240" step="5" value="150">
+        <output id="length-value" class="angle-value" for="length">150</output>
+      </label>
+      <button id="add-sand" type="button">досыпать</button>
+      <button id="reset" type="button">сбросить</button>
+      <button id="export" type="button">экспорт</button>
+    </nav>
+  </header>
+
+  <div id="card" class="card-tool" aria-hidden="true"></div>
+  <div id="hint" class="hint">проведи скребком через кучку</div>
+  <div id="status" class="status" aria-live="polite"></div>
+
+  <script>
+  (() => {
+    'use strict';
+
+    const canvas = document.querySelector('#sand');
+    const context = canvas.getContext('2d', { alpha: false, desynchronized: true });
+    const card = document.querySelector('#card');
+    const hint = document.querySelector('#hint');
+    const status = document.querySelector('#status');
+    const resetButton = document.querySelector('#reset');
+    const exportButton = document.querySelector('#export');
+    const addSandButton = document.querySelector('#add-sand');
+    const angleInput = document.querySelector('#angle');
+    const angleValue = document.querySelector('#angle-value');
+    const lengthInput = document.querySelector('#length');
+    const lengthValue = document.querySelector('#length-value');
+    const SAVE_KEY = 'sand.pustota.sculpt06';
+    const ANGLE_KEY = 'sand.pustota.scraper-angle';
+    const LENGTH_KEY = 'sand.pustota.scraper-length';
+    const MAX_HEIGHT = 32.0;
+
+
+    let simWidth = 0;
+    let simHeight = 0;
+    let sand = new Float32Array(0);
+    let initialMass = 0;
+    let offscreen = document.createElement('canvas');
+    let offscreenContext = offscreen.getContext('2d', { alpha: false });
+    let imageData = null;
+    let activePointer = null;
+    let lastPoint = null;
+    let strokes = [];
+    let settleFrames = 0;
+    let dirty = false;
+    let saveTimer = 0;
+    let frameTimes = [];
+    let lastFrameTime = performance.now();
+    let hiddenHint = false;
+    let mark = new Uint32Array(0);
+    let markStamp = 1;
+    let renderDirty = true;
+    let tableTone = new Int8Array(0);
+    let grainTone = new Int8Array(0);
+    let grainGate = new Float32Array(0);
+    let dotX = new Float32Array(0);
+    let dotY = new Float32Array(0);
+    let dotSize = new Uint8Array(0);
+    let lastRenderAt = 0;
+    let toolAngle = 45;
+    let toolLength = 150;
+
+    try {
+      const rawAngle = localStorage.getItem(ANGLE_KEY);
+      if (rawAngle !== null) {
+        const storedAngle = Number(rawAngle);
+        if (Number.isFinite(storedAngle)) toolAngle = clamp(storedAngle, 0, 180);
+      }
+    } catch (_) {}
+
+    try {
+      const rawLength = localStorage.getItem(LENGTH_KEY);
+      if (rawLength !== null) {
+        const storedLength = Number(rawLength);
+        if (Number.isFinite(storedLength)) toolLength = clamp(storedLength, 70, 240);
+      }
+    } catch (_) {}
+
+    const toolPose = { x: innerWidth * 0.72, y: innerHeight * 0.72 };
+
+    resizeCanvas();
+    initialize();
+    addEventListener('resize', resizeCanvas, { passive: true });
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerup', event => finishPointer(event, false));
+    canvas.addEventListener('pointercancel', event => finishPointer(event, true));
+    resetButton.addEventListener('click', resetSand);
+    addSandButton.addEventListener('click', addSandAtTool);
+    exportButton.addEventListener('click', exportImage);
+    angleInput.addEventListener('input', () => setToolAngle(Number(angleInput.value)));
+    lengthInput.addEventListener('input', () => setToolLength(Number(lengthInput.value)));
+    setToolAngle(toolAngle, false);
+    setToolLength(toolLength, false);
+    requestAnimationFrame(tick);
+
+    function chooseSize() {
+      const width = clamp(roundTo(innerWidth * (innerWidth > 900 ? 0.25 : 0.49), 8), 192, 320);
+      const height = clamp(roundTo(width * innerHeight / Math.max(innerWidth, 1), 8), 192, 448);
+      return { width, height };
+    }
+
+    function resizeCanvas() {
+      const dpr = Math.min(devicePixelRatio || 1, 2);
+      canvas.width = Math.max(1, Math.round(innerWidth * dpr));
+      canvas.height = Math.max(1, Math.round(innerHeight * dpr));
+      toolPose.x = clamp(toolPose.x, 0, innerWidth);
+      toolPose.y = clamp(toolPose.y, 0, innerHeight);
+      placeCard(toolPose.x, toolPose.y, toolAngle);
+      renderDirty = true;
+    }
+
+    function initialize(forceFresh = false) {
+      const saved = forceFresh ? null : loadState();
+      const size = chooseSize();
+      simWidth = saved?.width || size.width;
+      simHeight = saved?.height || size.height;
+      sand = saved?.sand || createMound(simWidth, simHeight);
+      offscreen.width = simWidth;
+      offscreen.height = simHeight;
+      imageData = offscreenContext.createImageData(simWidth, simHeight);
+      mark = new Uint32Array(simWidth * simHeight);
+      buildRenderNoise();
+      initialMass = sumMass();
+      strokes.length = 0;
+      settleFrames = 0;
+      dirty = false;
+      renderDirty = true;
+      updateCardWidth();
+      updateStatus();
+      render();
+      placeCard(toolPose.x, toolPose.y, toolAngle);
+    }
+
+    function buildRenderNoise() {
+      const count = simWidth * simHeight;
+      tableTone = new Int8Array(count);
+      grainTone = new Int8Array(count);
+      grainGate = new Float32Array(count);
+      dotX = new Float32Array(count);
+      dotY = new Float32Array(count);
+      dotSize = new Uint8Array(count);
+      for (let y = 0; y < simHeight; y++) {
+        for (let x = 0; x < simWidth; x++) {
+          const i = y * simWidth + x;
+          const vignette = Math.hypot((x / simWidth - 0.5) * 0.7, (y / simHeight - 0.5) * 0.7);
+          tableTone[i] = Math.round((hash2(x * 0.73, y * 0.73) - 0.5) * 3.2 - vignette * 10);
+          grainTone[i] = Math.round((hash2(x * 2.37, y * 2.37) - 0.5) * 18);
+          grainGate[i] = hash2(x * 1.91, y * 1.91);
+        }
+      }
+    }
+
+    function createMound(width, height) {
+      const field = new Float32Array(width * height);
+      const cx = width * 0.5;
+      const cy = height * 0.52;
+      const radius = Math.min(width, height) * 0.245;
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const dx = (x - cx) / radius;
+          const dy = (y - cy) / (radius * 0.86);
+          const r = Math.hypot(dx, dy);
+          if (r >= 1.08) continue;
+          const body = Math.pow(Math.max(0, 1 - r), 1.34) * 1.46;
+          const softEdge = smoothstep(1.08, 0.82, r);
+          const grain = (hash2(x, y) - 0.5) * 0.055 * softEdge;
+          field[y * width + x] = Math.max(0, body + grain);
+        }
+      }
+      return field;
+    }
+
+    function onPointerDown(event) {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      event.preventDefault();
+      try { canvas.setPointerCapture(event.pointerId); } catch (_) {}
+      activePointer = event.pointerId;
+      lastPoint = pointerPoint(event);
+      const start = clampToolScreen(event.clientX, event.clientY, toolAngle);
+      toolPose.x = start.x;
+      toolPose.y = start.y;
+      card.classList.add('pressed');
+      placeCard(toolPose.x, toolPose.y, toolAngle);
+      if (!hiddenHint) {
+        hint.classList.add('hidden');
+        hiddenHint = true;
+      }
+    }
+
+    function onPointerMove(event) {
+      const dragging = activePointer === event.pointerId;
+      if (dragging) event.preventDefault();
+      const events = typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [event];
+      for (const sample of events) {
+        if (dragging) {
+          const next = pointerPoint(sample);
+          const previous = lastPoint || next;
+          if (Math.hypot(next.x - previous.x, next.y - previous.y) > 0.00035) {
+            strokes.push({
+              from: previous,
+              to: next,
+              angle: toolAngle,
+              length: toolLength,
+              pressure: sample.pointerType === 'pen' && sample.pressure > 0 ? 0.74 + sample.pressure * 0.42 : 1
+            });
+            if (strokes.length > 90) strokes.splice(0, strokes.length - 90);
+            lastPoint = next;
+          }
+        }
+        const screen = clampToolScreen(sample.clientX, sample.clientY, toolAngle);
+        toolPose.x = screen.x;
+        toolPose.y = screen.y;
+      }
+      placeCard(toolPose.x, toolPose.y, toolAngle);
+    }
+
+    function finishPointer(event, cancelled) {
+      if (activePointer !== event.pointerId) return;
+      activePointer = null;
+      lastPoint = null;
+      if (cancelled) strokes.length = 0;
+      card.classList.remove('pressed');
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(saveState, 1000);
+    }
+
+    function applyStroke(stroke) {
+      const ax = stroke.from.x * (simWidth - 1);
+      const ay = stroke.from.y * (simHeight - 1);
+      const bx = stroke.to.x * (simWidth - 1);
+      const by = stroke.to.y * (simHeight - 1);
+      const dx = bx - ax;
+      const dy = by - ay;
+      const distance = Math.hypot(dx, dy);
+      if (distance < 0.01) return;
+      const dirX = dx / distance;
+      const dirY = dy / distance;
+      const bladeAngle = (stroke.angle ?? toolAngle) * Math.PI / 180;
+      const sideX = Math.cos(bladeAngle);
+      const sideY = Math.sin(bladeAngle);
+      const substeps = Math.max(1, Math.ceil(distance / 0.62));
+      const halfWidth = clamp((stroke.length ?? toolLength) * simWidth / Math.max(innerWidth, 1) * 0.5, 7, 64);
+      const pushDistance = 2.25 + Math.min(distance, 12) * 0.08;
+      const fraction = clamp((0.91 + Math.min(0.055, distance * 0.007)) * stroke.pressure, 0.88, 0.975);
+      let movedTotal = 0;
+
+      for (let step = 1; step <= substeps; step++) {
+        const t = step / substeps;
+        const cx = ax + dx * t;
+        const cy = ay + dy * t;
+        markStamp++;
+        if (markStamp === 0xffffffff) {
+          mark.fill(0);
+          markStamp = 1;
+        }
+        for (let lateral = -halfWidth; lateral <= halfWidth; lateral += 0.72) {
+          for (let depth = -1.1; depth <= 1.1; depth += 1.1) {
+            const sx = Math.round(cx + sideX * lateral - dirX * depth);
+            const sy = Math.round(cy + sideY * lateral - dirY * depth);
+            const tx = Math.round(sx + dirX * pushDistance);
+            const ty = Math.round(sy + dirY * pushDistance);
+            if (sx < 1 || sy < 1 || sx >= simWidth - 1 || sy >= simHeight - 1) continue;
+            if (tx < 1 || ty < 1 || tx >= simWidth - 1 || ty >= simHeight - 1) continue;
+            const source = sy * simWidth + sx;
+            if (mark[source] === markStamp) continue;
+            mark[source] = markStamp;
+            const target = ty * simWidth + tx;
+            if (target === source) continue;
+            const available = sand[source];
+            if (available < 0.0003) continue;
+            const moved = available * fraction;
+            sand[source] -= moved;
+            depositAcrossEdge(target, tx, ty, moved, dirX, dirY, sideX, sideY);
+            movedTotal += moved;
+          }
+        }
+      }
+      if (movedTotal > 0.0001) {
+        dirty = true;
+        renderDirty = true;
+      }
+      return movedTotal;
+    }
+
+    function depositAcrossEdge(target, tx, ty, amount, dirX, dirY, sideX, sideY) {
+      const sideAX = clamp(Math.round(tx + sideX), 0, simWidth - 1);
+      const sideAY = clamp(Math.round(ty + sideY), 0, simHeight - 1);
+      const sideBX = clamp(Math.round(tx - sideX), 0, simWidth - 1);
+      const sideBY = clamp(Math.round(ty - sideY), 0, simHeight - 1);
+      const frontX = clamp(Math.round(tx + dirX), 0, simWidth - 1);
+      const frontY = clamp(Math.round(ty + dirY), 0, simHeight - 1);
+      const wingAX = clamp(Math.round(tx + dirX + sideX), 0, simWidth - 1);
+      const wingAY = clamp(Math.round(ty + dirY + sideY), 0, simHeight - 1);
+      const wingBX = clamp(Math.round(tx + dirX - sideX), 0, simWidth - 1);
+      const wingBY = clamp(Math.round(ty + dirY - sideY), 0, simHeight - 1);
+      sand[target] += amount * 0.32;
+      sand[sideAY * simWidth + sideAX] += amount * 0.19;
+      sand[sideBY * simWidth + sideBX] += amount * 0.19;
+      sand[frontY * simWidth + frontX] += amount * 0.16;
+      sand[wingAY * simWidth + wingAX] += amount * 0.07;
+      sand[wingBY * simWidth + wingBX] += amount * 0.07;
+    }
+
+
+    function render() {
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.fillStyle = '#f4f4f1';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      const scaleX = canvas.width / simWidth;
+      const scaleY = canvas.height / simHeight;
+      const unit = Math.min(scaleX, scaleY);
+      const shadowX = Math.max(2, Math.round(unit * 1.25));
+      const shadowY = Math.max(3, Math.round(unit * 1.75));
+
+      const shadowPixels = imageData.data;
+      for (let i = 0; i < sand.length; i++) {
+        const p = i * 4;
+        const alpha = sand[i] > 0.18 ? clamp(Math.round((sand[i] - 0.18) * 36), 0, 58) : 0;
+        shadowPixels[p] = 17;
+        shadowPixels[p + 1] = 17;
+        shadowPixels[p + 2] = 17;
+        shadowPixels[p + 3] = alpha;
+      }
+      offscreenContext.putImageData(imageData, 0, 0);
+      context.save();
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = 'medium';
+      context.drawImage(offscreen, shadowX, shadowY, canvas.width, canvas.height);
+      context.restore();
+
+      let dotCount = 0;
+
+      for (let y = 0; y < simHeight; y++) {
+        for (let x = 0; x < simWidth; x++) {
+          const i = y * simWidth + x;
+          const h = sand[i];
+          if (h < 0.0015) continue;
+          const loose = clamp(h / 0.034, 0, 1);
+          if (h < 0.034 && grainGate[i] > loose) continue;
+
+          const jitterX = grainTone[i] / 18 * 0.26;
+          const jitterY = (grainGate[i] - 0.5) * 0.52;
+          const px = (x + 0.5 + jitterX) * scaleX;
+          const py = (y + 0.5 + jitterY) * scaleY;
+          const radius = clamp(unit * (0.13 + Math.min(Math.sqrt(h), 1.8) * 0.055), 0.48, unit * 0.26);
+          const size = Math.max(1, Math.round(radius * 2));
+          dotX[dotCount] = Math.round(px - size * 0.5);
+          dotY[dotCount] = Math.round(py - size * 0.5);
+          dotSize[dotCount] = size;
+          dotCount++;
+        }
+      }
+
+      context.fillStyle = '#111111';
+      for (let i = 0; i < dotCount; i++) {
+        context.fillRect(dotX[i], dotY[i], dotSize[i], dotSize[i]);
+      }
+      context.globalAlpha = 1;
+      renderDirty = false;
+    }
+
+    function tick(now) {
+      const elapsed = now - lastFrameTime;
+      lastFrameTime = now;
+      frameTimes.push(elapsed);
+      if (frameTimes.length > 36) frameTimes.shift();
+
+      let processed = 0;
+      while (strokes.length && processed < 24) {
+        applyStroke(strokes.shift());
+        processed++;
+      }
+      if (renderDirty && now - lastRenderAt >= 30) {
+        render();
+        lastRenderAt = now;
+      }
+      if (Math.floor(now / 800) !== Math.floor((now - elapsed) / 800)) updateStatus();
+      requestAnimationFrame(tick);
+    }
+
+    function pointerPoint(event) {
+      const rect = canvas.getBoundingClientRect();
+      const screen = clampToolScreen(event.clientX, event.clientY, toolAngle);
+      return {
+        x: clamp((screen.x - rect.left) / rect.width, 0, 1),
+        y: clamp((screen.y - rect.top) / rect.height, 0, 1)
+      };
+    }
+
+    function updateCardWidth() {
+      card.style.width = `${toolLength}px`;
+    }
+
+    function placeCard(x, y, angle) {
+      const screen = clampToolScreen(x, y, angle);
+      toolPose.x = screen.x;
+      toolPose.y = screen.y;
+      card.style.transform = `translate(${screen.x}px, ${screen.y}px) translate(-50%, -50%) rotate(${angle}deg)`;
+    }
+
+    function clampToolScreen(x, y, angle) {
+      const width = Number.parseFloat(card.style.width) || 150;
+      const height = 26;
+      const radians = angle * Math.PI / 180;
+      const halfX = Math.abs(Math.cos(radians)) * width * 0.5 + Math.abs(Math.sin(radians)) * height * 0.5;
+      const halfY = Math.abs(Math.sin(radians)) * width * 0.5 + Math.abs(Math.cos(radians)) * height * 0.5;
+      return {
+        x: clamp(x, halfX + 2, innerWidth - halfX - 2),
+        y: clamp(y, halfY + 2, innerHeight - halfY - 2)
+      };
+    }
+
+    function setToolAngle(value, persist = true) {
+      toolAngle = clamp(Math.round(Number(value) || 0), 0, 180);
+      angleInput.value = String(toolAngle);
+      angleValue.value = `${toolAngle}°`;
+      angleValue.textContent = `${toolAngle}°`;
+      placeCard(toolPose.x, toolPose.y, toolAngle);
+      if (persist) {
+        try { localStorage.setItem(ANGLE_KEY, String(toolAngle)); } catch (_) {}
+      }
+    }
+
+    function setToolLength(value, persist = true) {
+      toolLength = clamp(Math.round((Number(value) || 70) / 5) * 5, 70, 240);
+      lengthInput.value = String(toolLength);
+      lengthValue.value = String(toolLength);
+      lengthValue.textContent = String(toolLength);
+      updateCardWidth();
+      placeCard(toolPose.x, toolPose.y, toolAngle);
+      if (persist) {
+        try { localStorage.setItem(LENGTH_KEY, String(toolLength)); } catch (_) {}
+      }
+    }
+
+    function sampleHeight(x, y) {
+      const sx = clamp(Math.round(x), 0, simWidth - 1);
+      const sy = clamp(Math.round(y), 0, simHeight - 1);
+      return sand[sy * simWidth + sx];
+    }
+
+    function sumMass() {
+      let total = 0;
+      for (let i = 0; i < sand.length; i++) total += sand[i];
+      return total;
+    }
+
+    function getStats() {
+      let min = Infinity;
+      let max = -Infinity;
+      let total = 0;
+      let occupied = 0;
+      let weightedX = 0;
+      let weightedY = 0;
+      let weightedX2 = 0;
+      let weightedY2 = 0;
+      for (let i = 0; i < sand.length; i++) {
+        const value = sand[i];
+        const x = i % simWidth;
+        const y = Math.floor(i / simWidth);
+        min = Math.min(min, value);
+        max = Math.max(max, value);
+        total += value;
+        weightedX += x * value;
+        weightedY += y * value;
+        weightedX2 += x * x * value;
+        weightedY2 += y * y * value;
+        if (value > 0.003) occupied++;
+      }
+      const centerX = total ? weightedX / total : 0;
+      const centerY = total ? weightedY / total : 0;
+      return {
+        width: simWidth,
+        height: simHeight,
+        min,
+        max,
+        mean: total / sand.length,
+        mass: total,
+        initialMass,
+        massError: initialMass ? (total - initialMass) / initialMass : 0,
+        occupied,
+        pendingStrokes: strokes.length,
+        active: activePointer !== null,
+        idle: settleFrames === 0 && strokes.length === 0,
+        toolAngle,
+        toolLength,
+        centroid: { x: centerX / simWidth, y: centerY / simHeight },
+        spread: total ? (weightedX2 / total - centerX * centerX) / (simWidth * simWidth) + (weightedY2 / total - centerY * centerY) / (simHeight * simHeight) : 0,
+        scraperVisible: getComputedStyle(card).opacity !== '0',
+        renderer: 'points2d'
+      };
+    }
+
+    function saveState() {
+      if (!dirty) return;
+      try {
+        const packed = new Uint16Array(sand.length);
+        for (let i = 0; i < sand.length; i++) packed[i] = Math.round(clamp(sand[i] / MAX_HEIGHT, 0, 1) * 65535);
+        localStorage.setItem(SAVE_KEY, JSON.stringify({
+          version: 2,
+          width: simWidth,
+          height: simHeight,
+          data: bytesToBase64(new Uint8Array(packed.buffer))
+        }));
+        dirty = false;
+      } catch (error) {
+        console.warn('Не удалось сохранить песок:', error);
+      }
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(SAVE_KEY);
+        if (!raw) return null;
+        const saved = JSON.parse(raw);
+        if (saved.version !== 2 || !Number.isInteger(saved.width) || !Number.isInteger(saved.height)) return null;
+        if (saved.width < 128 || saved.height < 128 || saved.width > 768 || saved.height > 768) return null;
+        const bytes = base64ToBytes(saved.data);
+        if (bytes.byteLength !== saved.width * saved.height * 2) return null;
+        const packed = new Uint16Array(bytes.buffer);
+        const field = new Float32Array(packed.length);
+        for (let i = 0; i < packed.length; i++) field[i] = packed[i] / 65535 * MAX_HEIGHT;
+        return { width: saved.width, height: saved.height, sand: field };
+      } catch (error) {
+        console.warn('Сохранённый песок повреждён:', error);
+        return null;
+      }
+    }
+
+    function addSandAtTool() {
+      const cx = clamp(toolPose.x / Math.max(innerWidth, 1) * simWidth, 0, simWidth - 1);
+      const cy = clamp(toolPose.y / Math.max(innerHeight, 1) * simHeight, 0, simHeight - 1);
+      const radius = Math.min(simWidth, simHeight) * 0.10;
+      const minX = Math.max(0, Math.floor(cx - radius * 1.08));
+      const maxX = Math.min(simWidth - 1, Math.ceil(cx + radius * 1.08));
+      const minY = Math.max(0, Math.floor(cy - radius * 0.92));
+      const maxY = Math.min(simHeight - 1, Math.ceil(cy + radius * 0.92));
+
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          const dx = (x - cx) / radius;
+          const dy = (y - cy) / (radius * 0.84);
+          const r = Math.hypot(dx, dy);
+          if (r >= 1.06) continue;
+          const body = Math.pow(Math.max(0, 1 - r), 1.24) * 1.02;
+          const edge = smoothstep(1.06, 0.80, r);
+          const grain = (hash2(x + initialMass * 0.013, y + initialMass * 0.017) - 0.5) * 0.045 * edge;
+          const i = y * simWidth + x;
+          sand[i] = Math.min(MAX_HEIGHT, sand[i] + Math.max(0, body + grain));
+        }
+      }
+
+      initialMass = sumMass();
+      dirty = true;
+      renderDirty = true;
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(saveState, 700);
+      hint.textContent = 'песок досыпан у скребка';
+      hint.classList.remove('hidden');
+      setTimeout(() => hint.classList.add('hidden'), 1150);
+      return initialMass;
+    }
+
+    function resetSand() {
+      localStorage.removeItem(SAVE_KEY);
+      initialize(true);
+      hint.textContent = 'горсть возвращена';
+      hint.classList.remove('hidden');
+      setTimeout(() => hint.classList.add('hidden'), 1150);
+    }
+
+    function exportImage() {
+      render();
+      canvas.toBlob(blob => {
+        if (!blob) return;
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `sand-sculpture-${new Date().toISOString().slice(0, 10)}.png`;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+      }, 'image/png');
+    }
+
+    function updateStatus() {
+      const average = frameTimes.length ? frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length : 16.7;
+      const fps = Math.round(1000 / Math.max(average, 1));
+      const stats = getStats();
+      const massPercent = initialMass ? Math.round(stats.mass / initialMass * 1000) / 10 : 100;
+      status.textContent = `${massPercent}% песка · ${fps} fps${stats.idle ? ' · сон' : ''}`;
+    }
+
+    function bytesToBase64(bytes) {
+      let binary = '';
+      const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+      return btoa(binary);
+    }
+
+    function base64ToBytes(base64) {
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return bytes;
+    }
+
+    function hash2(x, y) {
+      const value = Math.sin(x * 127.1 + y * 311.7) * 43758.5453123;
+      return value - Math.floor(value);
+    }
+
+    function smoothstep(edge0, edge1, value) {
+      const t = clamp((value - edge0) / (edge1 - edge0 || 1), 0, 1);
+      return t * t * (3 - 2 * t);
+    }
+
+    function mix(a, b, t) { return a + (b - a) * t; }
+    function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+    function roundTo(value, step) { return Math.round(value / step) * step; }
+
+    window.__sandDebug = {
+      getState: getStats,
+      stroke(from, to, pressure = 1) {
+        strokes.push({ from, to, pressure, angle: toolAngle, length: toolLength });
+      },
+      sampleAt(x, y, radius = 2) {
+        const cx = clamp(Math.round(x * (simWidth - 1)), 0, simWidth - 1);
+        const cy = clamp(Math.round(y * (simHeight - 1)), 0, simHeight - 1);
+        let total = 0;
+        let count = 0;
+        for (let oy = -radius; oy <= radius; oy++) {
+          for (let ox = -radius; ox <= radius; ox++) {
+            const sx = clamp(cx + ox, 0, simWidth - 1);
+            const sy = clamp(cy + oy, 0, simHeight - 1);
+            total += sand[sy * simWidth + sx];
+            count++;
+          }
+        }
+        return total / count;
+      },
+      setAngle: setToolAngle,
+      setLength: setToolLength,
+      addSand: addSandAtTool,
+      reset: resetSand,
+      save: saveState
+    };
+  })();
+  </script>
+</body>
+</html>
