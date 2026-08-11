@@ -415,11 +415,13 @@ function stampWall() {
   if (!tool.down) return;
   const a = P.angle * Math.PI / 180;
   const ux = Math.cos(a), uy = Math.sin(a);
-  const nx = -uy, ny = ux;
+  let nx = -uy, ny = ux;
+  const mvx = tool.x - tool.px, mvy = tool.y - tool.py;
+  if (mvx * nx + mvy * ny < 0) { nx = -nx; ny = -ny; }
   const half = P.len * 0.5 / HC;
   const cx = tool.x / HC, cy = tool.y / HC;
   for (let l = -half; l <= half; l += 0.4) {
-    for (let d = -0.5; d <= 0.5; d += 0.5) {
+    for (let d = -1.2; d <= -0.2; d += 0.5) {
       const x = Math.round(cx + ux * l + nx * d), y = Math.round(cy + uy * l + ny * d);
       if (x < 0 || y < 0 || x >= hw || y >= hh) continue;
       wall[y * hw + x] = 1;
@@ -502,16 +504,23 @@ function hybridBlade(ax, ay, bx, by) {
 
       if (mass <= 0) continue;
 
-      // У лезвия есть высота. Пока вал ниже — кромка несёт всё; когда вал
-      // дорос до кромки, песок пересыпается через неё назад. Без предела вал
-      // растёт до сотен слоёв и обрушивается, как и положено горе такой высоты
-      const tx = bxp + nx * 0.6, ty = byp + ny * 0.6;
-      const at = Math.round(ty) * hw + Math.round(tx);
-      const room = Math.max(0, blade - hfield[at]);
-      const push = Math.min(mass, room);
-      if (push > 0) deposit(tx, ty, push);
-      const spill = mass - push;
-      if (spill > 0) deposit(bxp - nx * 0.9, byp - ny * 0.9, spill);
+      // Насыпь перед лезвием растёт вперёд, а не в одну линию: заполняем
+      // клетки по ходу движения до высоты кромки, пока материал не кончится.
+      // Одна клетка с потолком упиралась бы в предел мгновенно, и весь песок
+      // уходил бы назад — при том что вал ещё и не начал расти
+      let left = mass;
+      for (let f = 1.3; f <= 12 && left > 1e-5; f += 1) {
+        const tx = bxp + nx * f, ty = byp + ny * f;
+        const ix = Math.round(tx), iy = Math.round(ty);
+        if (ix < 1 || iy < 1 || ix >= hw - 2 || iy >= hh - 2) break;
+        const room = blade - hfield[iy * hw + ix];
+        if (room <= 0) continue;
+        const push = Math.min(left, room);
+        deposit(tx, ty, push);
+        left -= push;
+      }
+      // не поместилось даже в насыпь — пересыпается через кромку назад
+      if (left > 1e-5) deposit(bxp - nx * 1.4, byp - ny * 1.4, left);
     }
   }
 }
