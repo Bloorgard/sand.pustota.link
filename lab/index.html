@@ -30,7 +30,7 @@
   .modes button.on { background: #111; color: #fff; border-color: #111; }
   .modes button.wide { grid-column: 1 / -1; }
   .modes.relief { grid-template-columns: repeat(3, 1fr); }
-  .modes.relief button { font-size: 11px; padding: 5px 2px; }
+  .modes.relief button, .modes.yield button { font-size: 11px; padding: 5px 2px; }
 
   label { display: block; margin: 9px 0 3px; font-size: 11px; opacity: .6; }
   label span { float: right; opacity: .8; font-variant-numeric: tabular-nums; }
@@ -69,6 +69,11 @@
     <button data-mode="height">A · Карта высот</button>
     <button data-mode="grains">B · Зёрна</button>
     <button data-mode="hybrid" class="on wide">C · Гибрид</button>
+  </div>
+
+  <div class="modes yield">
+    <button data-yield="floor">порог</button>
+    <button data-yield="mc" class="on">Мор-Кулон</button>
   </div>
 
   <div class="modes relief">
@@ -155,7 +160,8 @@ const P = {
   dust: 0.35,       // ниже этого клетка не удерживает материал — крошка уходит к соседу
   cohesion: 3.5,    // высота, которую слой держит вертикально и не осыпает
   pour: 2600,       // масса в секунду из струи
-  relief: 'density' // density | light | lift
+  relief: 'density', // density | light | lift
+  yield: 'mc'       // floor | mc — модель порога сдвига
 };
 
 // ── скребок ──────────────────────────────────────────────────────────────
@@ -498,6 +504,7 @@ function hybridBlade(ax, ay, bx, by) {
 // осыпание, затухающее по мере слёживания
 function hybridRelax() {
   const talus = P.talus, k = P.relax, hold = P.hold, coh = P.cohesion;
+  const mohr = P.yield === 'mc';
   const decay = 1 - P.settle;
   for (let pass = 0; pass < 2; pass++) {
     for (let y = 1; y < hh - 1; y++) {
@@ -508,10 +515,18 @@ function hybridRelax() {
         if (h < 1e-3) continue;
         const live = loose[i];
         if (live < 0.02) continue;
-        // сцепление: слой держит сам себя, течёт только избыток сверх него.
-        // Без этого любая стенка оплывает до угла откоса и линия ползёт вширь
-        const mobile = h - coh;
-        if (mobile <= 0) continue;
+        // Порог сдвига. «Порог» замораживает весь слой тоньше сцепления.
+        // «Мор-Кулон» — вклад сцепления обратно пропорционален высоте: тонкий
+        // слой держит крутую стенку, толстый оплывает до угла откоса.
+        let crit, mobile;
+        if (mohr) {
+          crit = talus + coh / (h + 0.5);
+          mobile = h;
+        } else {
+          crit = talus;
+          mobile = h - coh;
+          if (mobile <= 0) continue;
+        }
         const kk = k * live;
 
         const d0 = h - hfield[i - 1], d1 = h - hfield[i + 1];
@@ -524,16 +539,16 @@ function hybridRelax() {
         const o3 = !wall[i + hw] && frameNo - clearedAt[i + hw] > hold;
 
         let total = 0;
-        if (o0 && d0 > talus) total += d0 - talus;
-        if (o1 && d1 > talus) total += d1 - talus;
-        if (o2 && d2 > talus) total += d2 - talus;
-        if (o3 && d3 > talus) total += d3 - talus;
+        if (o0 && d0 > crit) total += d0 - crit;
+        if (o1 && d1 > crit) total += d1 - crit;
+        if (o2 && d2 > crit) total += d2 - crit;
+        if (o3 && d3 > crit) total += d3 - crit;
         if (total <= 0) continue;
         const give = Math.min(mobile, total * kk) / total;
-        if (o0 && d0 > talus) { const m = (d0 - talus) * give; hfield[i] -= m; hfield[i - 1] += m; loose[i - 1] = 1; }
-        if (o1 && d1 > talus) { const m = (d1 - talus) * give; hfield[i] -= m; hfield[i + 1] += m; loose[i + 1] = 1; }
-        if (o2 && d2 > talus) { const m = (d2 - talus) * give; hfield[i] -= m; hfield[i - hw] += m; loose[i - hw] = 1; }
-        if (o3 && d3 > talus) { const m = (d3 - talus) * give; hfield[i] -= m; hfield[i + hw] += m; loose[i + hw] = 1; }
+        if (o0 && d0 > crit) { const m = (d0 - crit) * give; hfield[i] -= m; hfield[i - 1] += m; loose[i - 1] = 1; }
+        if (o1 && d1 > crit) { const m = (d1 - crit) * give; hfield[i] -= m; hfield[i + 1] += m; loose[i + 1] = 1; }
+        if (o2 && d2 > crit) { const m = (d2 - crit) * give; hfield[i] -= m; hfield[i - hw] += m; loose[i - hw] = 1; }
+        if (o3 && d3 > crit) { const m = (d3 - crit) * give; hfield[i] -= m; hfield[i + hw] += m; loose[i + hw] = 1; }
       }
     }
   }
@@ -825,6 +840,14 @@ bind('cohesion', 'cohesion', v => v.toFixed(1));
 bind('pour', 'pour', v => String(v));
 bind('lift', 'lift', v => v.toFixed(1));
 
+document.querySelectorAll('.modes.yield button').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.modes.yield button').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    P.yield = b.dataset.yield;
+  });
+});
+
 document.querySelectorAll('.modes.relief button').forEach(b => {
   b.addEventListener('click', () => {
     document.querySelectorAll('.modes.relief button').forEach(x => x.classList.remove('on'));
@@ -945,6 +968,16 @@ window.__lab = {
   setMode(m) { mode = m; },
   pour(dt) { pour(dt); },
   clear() { hfield.fill(0); loose.fill(0); nFree = 0; },
+  // ровная стенка заданной высоты и ширины — для повторяемых замеров
+  setLine(xPx, height, widthCells) {
+    const cx = Math.round(xPx / HC);
+    const half = Math.floor(widthCells / 2);
+    for (let y = Math.round(hh * 0.25); y < Math.round(hh * 0.75); y++)
+      for (let x = cx - half; x <= cx + half; x++) {
+        hfield[y * hw + x] = height;
+        loose[y * hw + x] = 1;
+      }
+  },
   // масса в круге — чтобы проверять, чисто ли дно за кромкой
   probe(xPx, yPx, rPx) {
     const cx = xPx / HC, cy = yPx / HC, r = rPx / HC;
