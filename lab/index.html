@@ -88,14 +88,14 @@
   <label>Длина скребка <span id="v-len">160</span></label>
   <input type="range" id="len" min="40" max="400" step="4" value="160">
 
-  <label>Угол естественного откоса <span id="v-talus">0.80</span></label>
-  <input type="range" id="talus" min="0" max="3" step="0.05" value="0.8">
+  <label>Угол естественного откоса <span id="v-talus">2.05</span></label>
+  <input type="range" id="talus" min="0" max="3" step="0.05" value="2.05">
 
-  <label>Скорость осыпания <span id="v-relax">0.20</span></label>
-  <input type="range" id="relax" min="0" max="0.25" step="0.01" value="0.2">
+  <label>Скорость осыпания <span id="v-relax">0.24</span></label>
+  <input type="range" id="relax" min="0" max="0.25" step="0.01" value="0.24">
 
-  <label>Слёживание <span id="v-settle">0.06</span></label>
-  <input type="range" id="settle" min="0" max="0.3" step="0.01" value="0.06">
+  <label>Слёживание <span id="v-settle">0.17</span></label>
+  <input type="range" id="settle" min="0" max="0.3" step="0.01" value="0.17">
 
   <label>Сцепление <span id="v-cohesion">3.5</span></label>
   <input type="range" id="cohesion" min="0" max="8" step="0.1" value="3.5">
@@ -109,8 +109,8 @@
   <label>Струя <span id="v-pour">2600</span></label>
   <input type="range" id="pour" min="400" max="9000" step="100" value="2600">
 
-  <label>Россыпь с кромки <span id="v-spray">1.0</span></label>
-  <input type="range" id="spray" min="0" max="3" step="0.1" value="1">
+  <label>Россыпь с кромки <span id="v-spray">0.3</span></label>
+  <input type="range" id="spray" min="0" max="3" step="0.1" value="0.3">
 
   <label>Подъём рельефа <span id="v-lift">3.2</span></label>
   <input type="range" id="lift" min="0" max="10" step="0.2" value="3.2">
@@ -155,10 +155,10 @@ let mode = 'hybrid';
 
 // ── параметры ────────────────────────────────────────────────────────────
 const P = {
-  angle: 45, len: 160, talus: 0.8, relax: 0.2,
-  settle: 0.06,     // как быстро песок слёживается и перестаёт течь
+  angle: 45, len: 160, talus: 2.05, relax: 0.24,
+  settle: 0.17,     // как быстро песок слёживается и перестаёт течь
   hold: 26,         // сколько кадров борозда за кромкой не принимает материал
-  spray: 1,         // сколько зерна срывается с кромки
+  spray: 0.3,       // сколько зерна срывается с кромки
   lift: 3.2,        // подъём зерна на единицу высоты
   dust: 0.35,       // ниже этого клетка не удерживает материал — крошка уходит к соседу
   cohesion: 3.5,    // высота, которую слой держит вертикально и не осыпает
