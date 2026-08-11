@@ -100,6 +100,9 @@
   <label>Сцепление <span id="v-cohesion">3.5</span></label>
   <input type="range" id="cohesion" min="0" max="8" step="0.1" value="3.5">
 
+  <label>Высота лезвия <span id="v-blade">26</span></label>
+  <input type="range" id="blade" min="4" max="200" step="2" value="26">
+
   <label>Слипание крошек <span id="v-dust">0.35</span></label>
   <input type="range" id="dust" min="0" max="1.5" step="0.05" value="0.35">
 
@@ -159,6 +162,7 @@ const P = {
   lift: 3.2,        // подъём зерна на единицу высоты
   dust: 0.35,       // ниже этого клетка не удерживает материал — крошка уходит к соседу
   cohesion: 3.5,    // высота, которую слой держит вертикально и не осыпает
+  blade: 26,        // высота лезвия: выше этого вал пересыпается через кромку
   pour: 2600,       // масса в секунду из струи
   relief: 'density', // density | light | lift
   yield: 'mc'       // floor | mc — модель порога сдвига
@@ -457,6 +461,7 @@ function hybridBlade(ax, ay, bx, by) {
   // Материал сдвигается ровно настолько, насколько кромка продвинулась по
   // своей нормали. Движение вдоль лезвия ничего не толкает — нож скользит
   // по поверхности, как в жизни.
+  const blade = P.blade;
   const advance = (mvx * nx + mvy * ny) / HC / steps;
   if (advance < 0.02) return;
   const reach = advance + 1.0;   // глубина захвата позади кромки
@@ -496,7 +501,17 @@ function hybridBlade(ax, ay, bx, by) {
       }
 
       if (mass <= 0) continue;
-      deposit(bxp + nx * 0.6, byp + ny * 0.6, mass);
+
+      // У лезвия есть высота. Пока вал ниже — кромка несёт всё; когда вал
+      // дорос до кромки, песок пересыпается через неё назад. Без предела вал
+      // растёт до сотен слоёв и обрушивается, как и положено горе такой высоты
+      const tx = bxp + nx * 0.6, ty = byp + ny * 0.6;
+      const at = Math.round(ty) * hw + Math.round(tx);
+      const room = Math.max(0, blade - hfield[at]);
+      const push = Math.min(mass, room);
+      if (push > 0) deposit(tx, ty, push);
+      const spill = mass - push;
+      if (spill > 0) deposit(bxp - nx * 0.9, byp - ny * 0.9, spill);
     }
   }
 }
@@ -829,13 +844,14 @@ function applyKeys(dt) {
   if (keys.has('KeyS')) setParam('len', P.len - grow);
   if (keys.has('KeyD')) setParam('len', P.len + grow);
 }
-bind('angle', 'angle', v => v + '°');
-bind('len', 'len', v => v);
+bind('angle', 'angle', v => Math.round(v) + '°');
+bind('len', 'len', v => Math.round(v));
 bind('talus', 'talus', v => v.toFixed(2));
 bind('relax', 'relax', v => v.toFixed(2));
 bind('settle', 'settle', v => v.toFixed(2));
 bind('spray', 'spray', v => v.toFixed(1));
 bind('dust', 'dust', v => v.toFixed(2));
+bind('blade', 'blade', v => Math.round(v));
 bind('cohesion', 'cohesion', v => v.toFixed(1));
 bind('pour', 'pour', v => String(v));
 bind('lift', 'lift', v => v.toFixed(1));
@@ -968,6 +984,22 @@ window.__lab = {
   setMode(m) { mode = m; },
   pour(dt) { pour(dt); },
   clear() { hfield.fill(0); loose.fill(0); nFree = 0; },
+  // где стоит вершина и где центр масс поперёк полосы
+  crest(yPx) {
+    const y = Math.round(yPx / HC);
+    let peakX = -1, peakH = 0, sum = 0, moment = 0;
+    for (let x = 1; x < hw - 1; x++) {
+      const h = hfield[y * hw + x];
+      if (h > peakH) { peakH = h; peakX = x; }
+      sum += h; moment += h * x;
+    }
+    return {
+      peak: peakX < 0 ? null : peakX * HC,
+      peakH: +peakH.toFixed(2),
+      centroid: sum > 0 ? +(moment / sum * HC).toFixed(1) : null,
+      mass: +sum.toFixed(1)
+    };
+  },
   // ровная стенка заданной высоты и ширины — для повторяемых замеров
   setLine(xPx, height, widthCells) {
     const cx = Math.round(xPx / HC);
