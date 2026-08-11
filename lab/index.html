@@ -1,0 +1,980 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Sand Lab — сравнение движков</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; background: #f4f4f1; }
+  body { font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #111; touch-action: none; }
+  #sand { display: block; position: fixed; inset: 0; width: 100%; height: 100%; cursor: none; }
+
+  #panel {
+    position: fixed; top: 16px; left: 16px; z-index: 10;
+    background: rgba(255,255,255,.82); backdrop-filter: blur(8px);
+    border: 1px solid rgba(0,0,0,.08); border-radius: 10px;
+    padding: 12px 14px; width: 260px;
+    box-shadow: 0 4px 24px rgba(0,0,0,.06);
+  }
+  #panel.collapsed > *:not(.head) { display: none; }
+  .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .head b { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; opacity: .55; }
+  .head button { border: 0; background: none; font-size: 15px; cursor: pointer; opacity: .5; padding: 0 2px; }
+
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+  .modes button {
+    padding: 7px 4px; border: 1px solid rgba(0,0,0,.14); background: #fff;
+    border-radius: 7px; cursor: pointer; font: inherit; font-size: 12px;
+  }
+  .modes button.on { background: #111; color: #fff; border-color: #111; }
+  .modes button.wide { grid-column: 1 / -1; }
+  .modes.relief { grid-template-columns: repeat(3, 1fr); }
+  .modes.relief button { font-size: 11px; padding: 5px 2px; }
+
+  label { display: block; margin: 9px 0 3px; font-size: 11px; opacity: .6; }
+  label span { float: right; opacity: .8; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: #111; }
+  .row { display: flex; gap: 6px; margin-top: 12px; }
+  .row button {
+    flex: 1; padding: 7px; border: 1px solid rgba(0,0,0,.14); background: #fff;
+    border-radius: 7px; cursor: pointer; font: inherit; font-size: 12px;
+  }
+  .note { margin-top: 10px; font-size: 11px; line-height: 1.45; opacity: .55; }
+  #hud {
+    position: fixed; bottom: 14px; left: 16px; z-index: 10; font-size: 11px;
+    opacity: .4; font-variant-numeric: tabular-nums;
+  }
+  #legend {
+    position: fixed; right: 20px; bottom: 18px; z-index: 10;
+    display: grid; gap: 5px; opacity: .45; user-select: none;
+  }
+  #legend div { display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
+  #legend kbd {
+    display: inline-grid; place-items: center; min-width: 19px; height: 19px;
+    padding: 0 4px; border: 1px solid rgba(0,0,0,.22); border-radius: 4px;
+    font: 500 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  #legend kbd.on { background: #111; color: #fff; border-color: #111; }
+  #legend i { font-style: normal; font-size: 10.5px; margin-left: 4px; min-width: 62px; }
+</style>
+</head>
+<body>
+<canvas id="sand"></canvas>
+
+<div id="panel">
+  <div class="head"><b>Движок песка</b><button id="fold">–</button></div>
+
+  <div class="modes">
+    <button data-mode="height">A · Карта высот</button>
+    <button data-mode="grains">B · Зёрна</button>
+    <button data-mode="hybrid" class="on wide">C · Гибрид</button>
+  </div>
+
+  <div class="modes relief">
+    <button data-relief="density" class="on">плотность</button>
+    <button data-relief="light">свет</button>
+    <button data-relief="lift">подъём</button>
+  </div>
+
+  <label>Угол скребка <span id="v-angle">45°</span></label>
+  <input type="range" id="angle" min="0" max="180" step="1" value="45">
+
+  <label>Длина скребка <span id="v-len">160</span></label>
+  <input type="range" id="len" min="40" max="400" step="4" value="160">
+
+  <label>Угол естественного откоса <span id="v-talus">0.80</span></label>
+  <input type="range" id="talus" min="0" max="3" step="0.05" value="0.8">
+
+  <label>Скорость осыпания <span id="v-relax">0.20</span></label>
+  <input type="range" id="relax" min="0" max="0.25" step="0.01" value="0.2">
+
+  <label>Слёживание <span id="v-settle">0.06</span></label>
+  <input type="range" id="settle" min="0" max="0.3" step="0.01" value="0.06">
+
+  <label>Сцепление <span id="v-cohesion">3.5</span></label>
+  <input type="range" id="cohesion" min="0" max="8" step="0.1" value="3.5">
+
+  <label>Слипание крошек <span id="v-dust">0.35</span></label>
+  <input type="range" id="dust" min="0" max="1.5" step="0.05" value="0.35">
+
+  <label>Струя <span id="v-pour">2600</span></label>
+  <input type="range" id="pour" min="400" max="9000" step="100" value="2600">
+
+  <label>Россыпь с кромки <span id="v-spray">1.0</span></label>
+  <input type="range" id="spray" min="0" max="3" step="0.1" value="1">
+
+  <label>Подъём рельефа <span id="v-lift">3.2</span></label>
+  <input type="range" id="lift" min="0" max="10" step="0.2" value="3.2">
+
+  <div class="row">
+    <button id="reset">Заново</button>
+    <button id="add">Досыпать</button>
+  </div>
+
+  <div class="note" id="note"></div>
+</div>
+
+<div id="hud"></div>
+
+<div id="legend">
+  <div><kbd>Q</kbd><kbd>W</kbd><i>поворот</i></div>
+  <div><kbd>E</kbd><kbd>R</kbd><i>шаг 45°</i></div>
+  <div><kbd>S</kbd><kbd>D</kbd><i>длина</i></div>
+  <div><kbd>A</kbd><i>сыпать струёй</i></div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+const canvas = document.getElementById('sand');
+const ctx = canvas.getContext('2d', { alpha: false });
+const hud = document.getElementById('hud');
+const note = document.getElementById('note');
+
+const NOTES = {
+  height: 'Непрерывное поле массы. Скребок выгребает материал полосой, ' +
+          'откос держит склон. Зерно рисуется по плотности — не живёт само.',
+  grains: 'Каждое зерно — объект с координатой. Скребок непроницаем и ' +
+          'выталкивает зёрна перед кромкой. Стопки сыплются к соседям.',
+  hybrid: 'Масса в карте высот, зёрна срываются с кромки. Слой держит форму ' +
+          'сцеплением, а лезвие не даёт валу осыпаться назад в путь.'
+};
+
+let W = 0, H = 0;
+let mode = 'hybrid';
+
+// ── параметры ────────────────────────────────────────────────────────────
+const P = {
+  angle: 45, len: 160, talus: 0.8, relax: 0.2,
+  settle: 0.06,     // как быстро песок слёживается и перестаёт течь
+  hold: 26,         // сколько кадров борозда за кромкой не принимает материал
+  spray: 1,         // сколько зерна срывается с кромки
+  lift: 3.2,        // подъём зерна на единицу высоты
+  dust: 0.35,       // ниже этого клетка не удерживает материал — крошка уходит к соседу
+  cohesion: 3.5,    // высота, которую слой держит вертикально и не осыпает
+  pour: 2600,       // масса в секунду из струи
+  relief: 'density' // density | light | lift
+};
+
+// ── скребок ──────────────────────────────────────────────────────────────
+const tool = { x: 0, y: 0, px: 0, py: 0, down: false };
+
+// ═════════════════════════════ A · КАРТА ВЫСОТ ═══════════════════════════
+const CELL = 4;                 // px на клетку
+let gw = 0, gh = 0;
+let field = null;               // Float32Array — высота в «слоях зерна»
+
+function heightInit(fresh) {
+  gw = Math.ceil(W / CELL);
+  gh = Math.ceil(H / CELL);
+  field = new Float32Array(gw * gh);
+  if (fresh) heightPile(gw * 0.5, gh * 0.5, Math.min(gw, gh) * 0.11, 9);
+}
+
+function heightPile(cx, cy, r, peak) {
+  const x0 = Math.max(0, Math.floor(cx - r)), x1 = Math.min(gw - 1, Math.ceil(cx + r));
+  const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(gh - 1, Math.ceil(cy + r));
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) {
+      const d = Math.hypot(x - cx, y - cy) / r;
+      if (d >= 1) continue;
+      field[y * gw + x] += peak * (1 - d * d) * (0.85 + hash(x, y) * 0.3);
+    }
+}
+
+// скребок как непроницаемая кромка: выгребает полосу и кладёт материал
+// перед собой, по нормали в сторону движения
+function heightBlade(ax, ay, bx, by) {
+  const mvx = bx - ax, mvy = by - ay;
+  const dist = Math.hypot(mvx, mvy);
+  if (dist < 0.4) return;
+
+  const a = P.angle * Math.PI / 180;
+  const ux = Math.cos(a), uy = Math.sin(a);        // вдоль лезвия
+  let nx = -uy, ny = ux;                            // нормаль
+  const front = (mvx * nx + mvy * ny) >= 0 ? 1 : -1;
+  nx *= front; ny *= front;
+
+  const half = P.len * 0.5 / CELL;
+  const steps = Math.max(1, Math.ceil(dist / CELL * 1.6));
+
+  for (let s = 1; s <= steps; s++) {
+    const t = s / steps;
+    const cx = (ax + mvx * t) / CELL, cy = (ay + mvy * t) / CELL;
+    for (let l = -half; l <= half; l += 0.7) {
+      const bxp = cx + ux * l, byp = cy + uy * l;
+      // забираем всё из полосы позади кромки и кладём на клетку впереди нее
+      for (let d = -1.4; d <= 0.2; d += 0.7) {
+        const sx = Math.round(bxp + nx * d), sy = Math.round(byp + ny * d);
+        if (sx < 0 || sy < 0 || sx >= gw || sy >= gh) continue;
+        const si = sy * gw + sx;
+        const m = field[si];
+        if (m < 1e-4) continue;
+        const tx = Math.round(bxp + nx * 1.1), ty = Math.round(byp + ny * 1.1);
+        if (tx < 0 || ty < 0 || tx >= gw || ty >= gh) continue;
+        const ti = ty * gw + tx;
+        if (ti === si) continue;
+        field[si] = 0;
+        field[ti] += m;
+      }
+    }
+  }
+}
+
+// осыпание: перепад выше угла откоса перетекает к соседу
+function heightRelax() {
+  const talus = P.talus, k = P.relax;
+  if (k <= 0) return;
+  for (let pass = 0; pass < 2; pass++) {
+    for (let y = 1; y < gh - 1; y++) {
+      for (let x = 1; x < gw - 1; x++) {
+        const i = y * gw + x;
+        const h = field[i];
+        if (h < 1e-3) continue;
+        // перетекаем ко всем соседям ниже угла откоса — иначе поле ползёт крестом
+        const d0 = h - field[i - 1], d1 = h - field[i + 1];
+        const d2 = h - field[i - gw], d3 = h - field[i + gw];
+        let total = 0;
+        if (d0 > talus) total += d0 - talus;
+        if (d1 > talus) total += d1 - talus;
+        if (d2 > talus) total += d2 - talus;
+        if (d3 > talus) total += d3 - talus;
+        if (total <= 0) continue;
+        const give = Math.min(h, total * k) / total;
+        if (d0 > talus) { const m = (d0 - talus) * give; field[i] -= m; field[i - 1] += m; }
+        if (d1 > talus) { const m = (d1 - talus) * give; field[i] -= m; field[i + 1] += m; }
+        if (d2 > talus) { const m = (d2 - talus) * give; field[i] -= m; field[i - gw] += m; }
+        if (d3 > talus) { const m = (d3 - talus) * give; field[i] -= m; field[i + gw] += m; }
+      }
+    }
+  }
+}
+
+// ═════════════════════════════ B · ЗЁРНА ═════════════════════════════════
+const GRAIN = 2.4;              // px — размер клетки укладки ≈ зерно
+const CAP_STEP = 2;             // перепад стопок, после которого зерно сползает
+let cw = 0, ch = 0;
+let gx = null, gy = null;       // Float32Array позиций
+let count = null;               // Int32Array плотности
+let nGrains = 0;
+const MAX_GRAINS = 60000;
+
+function grainsInit(fresh) {
+  cw = Math.ceil(W / GRAIN);
+  ch = Math.ceil(H / GRAIN);
+  count = new Int32Array(cw * ch);
+  if (fresh || !gx) {
+    gx = new Float32Array(MAX_GRAINS);
+    gy = new Float32Array(MAX_GRAINS);
+    nGrains = 0;
+    grainsPile(W * 0.5, H * 0.5, Math.min(W, H) * 0.09, 26000);
+  }
+}
+
+function grainsPile(cx, cy, r, n) {
+  for (let i = 0; i < n && nGrains < MAX_GRAINS; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const d = Math.sqrt(Math.random()) * r;
+    gx[nGrains] = cx + Math.cos(a) * d;
+    gy[nGrains] = cy + Math.sin(a) * d;
+    nGrains++;
+  }
+}
+
+// скребок непроницаем: всё, что оказалось под ним, выталкивается на
+// переднюю сторону кромки
+function grainsBlade(ax, ay, bx, by) {
+  const mvx = bx - ax, mvy = by - ay;
+  const dist = Math.hypot(mvx, mvy);
+  if (dist < 0.3) return;
+
+  const a = P.angle * Math.PI / 180;
+  const ux = Math.cos(a), uy = Math.sin(a);
+  let nx = -uy, ny = ux;
+  const front = (mvx * nx + mvy * ny) >= 0 ? 1 : -1;
+  nx *= front; ny *= front;
+
+  const half = P.len * 0.5;
+  const thick = GRAIN * 1.6;
+  const steps = Math.max(1, Math.ceil(dist / thick));
+
+  for (let s = 1; s <= steps; s++) {
+    const t = s / steps;
+    const cx = ax + mvx * t, cy = ay + mvy * t;
+    for (let i = 0; i < nGrains; i++) {
+      const dx = gx[i] - cx, dy = gy[i] - cy;
+      if (dx * dx + dy * dy > (half + thick) * (half + thick)) continue;
+      const along = dx * ux + dy * uy;
+      if (along < -half || along > half) continue;
+      const across = dx * nx + dy * ny;
+      if (across > thick || across < -thick * 3) continue;
+      // ставим зерно вплотную перед кромкой
+      gx[i] = cx + ux * along + nx * (thick + 0.35);
+      gy[i] = cy + uy * along + ny * (thick + 0.35);
+    }
+  }
+}
+
+// осыпание: зерно из переполненной клетки сползает к самому низкому соседу
+function grainsRelax() {
+  count.fill(0);
+  for (let i = 0; i < nGrains; i++) {
+    let cx = (gx[i] / GRAIN) | 0, cy = (gy[i] / GRAIN) | 0;
+    if (cx < 0) { gx[i] = 0.5; cx = 0; }
+    if (cy < 0) { gy[i] = 0.5; cy = 0; }
+    if (cx >= cw) { cx = cw - 1; gx[i] = W - 0.5; }
+    if (cy >= ch) { cy = ch - 1; gy[i] = H - 0.5; }
+    count[cy * cw + cx]++;
+  }
+
+  const step = Math.max(0.5, CAP_STEP * (P.talus > 0 ? P.talus : 0.05));
+  const speed = P.relax * 4;
+  if (speed <= 0) return;
+
+  // стохастический выбор соседа из восьми: детерминированный «в самого
+  // низкого» выстраивает зёрна в полосы вдоль осей
+  for (let i = 0; i < nGrains; i++) {
+    const cx = (gx[i] / GRAIN) | 0, cy = (gy[i] / GRAIN) | 0;
+    if (cx < 1 || cy < 1 || cx >= cw - 1 || cy >= ch - 1) continue;
+    const c = cy * cw + cx;
+    const here = count[c];
+    if (here < 2) continue;
+    const d = (Math.random() * 8) | 0;
+    const ox = NX[d], oy = NY[d];
+    const nc = c + oy * cw + ox;
+    const need = ox && oy ? step * 1.41 : step;
+    if (here - count[nc] <= need) continue;
+    gx[i] += ox * speed + (Math.random() - 0.5) * 0.5;
+    gy[i] += oy * speed + (Math.random() - 0.5) * 0.5;
+    count[c]--; count[nc]++;
+  }
+}
+
+const NX = [-1, 1, 0, 0, -1, 1, -1, 1];
+const NY = [0, 0, -1, 1, -1, -1, 1, 1];
+
+// ═════════════════════════════ C · ГИБРИД ════════════════════════════════
+// Масса живёт в карте высот — она даёт контроль формы, дно под скребком и
+// сохранение материала. По кромке отрываются настоящие зёрна. Песок
+// слёживается: осыпание затухает после жеста, и форма фиксируется.
+const HC = 3;                   // px на клетку
+let hw = 0, hh = 0;
+let hfield = null;              // высота
+let loose = null;               // 0..1 — насколько песок ещё подвижен
+let clearedAt = null;           // номер кадра, когда клетку выскребли
+let wall = null;                // клетки, занятые лезвием прямо сейчас
+let wallDirty = false;
+let frameNo = 0;
+
+const MAX_FREE = 9000;
+const FREE_MASS = 0.05;         // высота, уносимая одним свободным зерном
+let fx = null, fy = null, fvx = null, fvy = null, nFree = 0;
+
+function hybridInit(fresh) {
+  hw = Math.ceil(W / HC);
+  hh = Math.ceil(H / HC);
+  hfield = new Float32Array(hw * hh);
+  loose = new Float32Array(hw * hh);
+  clearedAt = new Int32Array(hw * hh).fill(-9999);
+  wall = new Uint8Array(hw * hh);
+  wallDirty = false;
+  fx = new Float32Array(MAX_FREE); fy = new Float32Array(MAX_FREE);
+  fvx = new Float32Array(MAX_FREE); fvy = new Float32Array(MAX_FREE);
+  nFree = 0;
+  if (fresh) hybridPile(hw * 0.5, hh * 0.5, Math.min(hw, hh) * 0.12, 7);
+}
+
+function hybridPile(cx, cy, r, peak) {
+  const x0 = Math.max(0, Math.floor(cx - r)), x1 = Math.min(hw - 1, Math.ceil(cx + r));
+  const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(hh - 1, Math.ceil(cy + r));
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) {
+      const d = Math.hypot(x - cx, y - cy) / r;
+      if (d >= 1) continue;
+      hfield[y * hw + x] += peak * (1 - d * d) * (0.85 + hash(x, y) * 0.3);
+      loose[y * hw + x] = 1;
+    }
+}
+
+// Лезвие — физическое препятствие: пока оно стоит в песке, вал не может
+// осыпаться сквозь него назад, в только что расчищенный путь.
+function stampWall() {
+  if (wallDirty) { wall.fill(0); wallDirty = false; }
+  if (!tool.down) return;
+  const a = P.angle * Math.PI / 180;
+  const ux = Math.cos(a), uy = Math.sin(a);
+  const nx = -uy, ny = ux;
+  const half = P.len * 0.5 / HC;
+  const cx = tool.x / HC, cy = tool.y / HC;
+  for (let l = -half; l <= half; l += 0.4) {
+    for (let d = -0.5; d <= 0.5; d += 0.5) {
+      const x = Math.round(cx + ux * l + nx * d), y = Math.round(cy + uy * l + ny * d);
+      if (x < 0 || y < 0 || x >= hw || y >= hh) continue;
+      wall[y * hw + x] = 1;
+      wallDirty = true;
+    }
+  }
+}
+
+// Укладка с округлением в одну клетку рвёт вал на комки: соседние точки
+// кромки попадают то в одну клетку, то в другую. Раскладываем по четырём.
+function deposit(fx, fy, amount) {
+  const x0 = Math.floor(fx), y0 = Math.floor(fy);
+  if (x0 < 1 || y0 < 1 || x0 >= hw - 2 || y0 >= hh - 2) return;
+  const tx = fx - x0, ty = fy - y0;
+  const i = y0 * hw + x0;
+  const w0 = (1 - tx) * (1 - ty), w1 = tx * (1 - ty);
+  const w2 = (1 - tx) * ty, w3 = tx * ty;
+  hfield[i] += amount * w0;          loose[i] = 1;
+  hfield[i + 1] += amount * w1;      loose[i + 1] = 1;
+  hfield[i + hw] += amount * w2;     loose[i + hw] = 1;
+  hfield[i + hw + 1] += amount * w3; loose[i + hw + 1] = 1;
+}
+
+function hybridBlade(ax, ay, bx, by) {
+  const mvx = bx - ax, mvy = by - ay;
+  const dist = Math.hypot(mvx, mvy);
+  if (dist < 0.3) return;
+
+  const a = P.angle * Math.PI / 180;
+  const ux = Math.cos(a), uy = Math.sin(a);
+  let nx = -uy, ny = ux;
+  const front = (mvx * nx + mvy * ny) >= 0 ? 1 : -1;
+  nx *= front; ny *= front;
+
+  const half = P.len * 0.5 / HC;
+  const steps = Math.max(1, Math.ceil(dist / HC * 2));   // подшаг ≤ полклетки
+  const speed = dist / steps;
+
+  // Материал сдвигается ровно настолько, насколько кромка продвинулась по
+  // своей нормали. Движение вдоль лезвия ничего не толкает — нож скользит
+  // по поверхности, как в жизни.
+  const advance = (mvx * nx + mvy * ny) / HC / steps;
+  if (advance < 0.02) return;
+  const reach = advance + 1.0;   // глубина захвата позади кромки
+
+  for (let s = 1; s <= steps; s++) {
+    const t = s / steps;
+    const cx = (ax + mvx * t) / HC, cy = (ay + mvy * t) / HC;
+    // Материал не бежит вдоль лезвия — он остаётся напротив того места, где
+    // его подобрали, и просто копится перед кромкой. Форму вала держит
+    // сцепление, а от осыпания назад его удерживает само лезвие.
+    for (let l = -half; l <= half; l += 0.34) {
+      const bxp = cx + ux * l, byp = cy + uy * l;
+      let mass = 0;
+
+      // только то, что осталось позади кромки: уже вытолкнутый материал
+      // лежит впереди и второй раз не подхватывается
+      for (let d = -reach; d <= -0.1; d += 0.34) {
+        const sx = Math.round(bxp + nx * d), sy = Math.round(byp + ny * d);
+        if (sx < 1 || sy < 1 || sx >= hw - 1 || sy >= hh - 1) continue;
+        const si = sy * hw + sx;
+        const have = hfield[si];
+        if (have < 1e-5) continue;
+        hfield[si] = 0;
+        clearedAt[si] = frameNo;
+        mass += have;
+
+        // часть материала срывается с кромки настоящими зёрнами
+        if (nFree < MAX_FREE - 1 && mass > FREE_MASS && Math.random() < 0.16 * P.spray) {
+          mass -= FREE_MASS;
+          fx[nFree] = sx * HC; fy[nFree] = sy * HC;
+          const sp = 0.5 + Math.random() * speed * 0.8;
+          const sc = (Math.random() - 0.5) * 1.6;
+          fvx[nFree] = nx * sp + ux * sc;
+          fvy[nFree] = ny * sp + uy * sc;
+          nFree++;
+        }
+      }
+
+      if (mass <= 0) continue;
+      deposit(bxp + nx * 0.6, byp + ny * 0.6, mass);
+    }
+  }
+}
+
+// осыпание, затухающее по мере слёживания
+function hybridRelax() {
+  const talus = P.talus, k = P.relax, hold = P.hold, coh = P.cohesion;
+  const decay = 1 - P.settle;
+  for (let pass = 0; pass < 2; pass++) {
+    for (let y = 1; y < hh - 1; y++) {
+      for (let x = 1; x < hw - 1; x++) {
+        const i = y * hw + x;
+        if (wall[i]) continue;
+        const h = hfield[i];
+        if (h < 1e-3) continue;
+        const live = loose[i];
+        if (live < 0.02) continue;
+        // сцепление: слой держит сам себя, течёт только избыток сверх него.
+        // Без этого любая стенка оплывает до угла откоса и линия ползёт вширь
+        const mobile = h - coh;
+        if (mobile <= 0) continue;
+        const kk = k * live;
+
+        const d0 = h - hfield[i - 1], d1 = h - hfield[i + 1];
+        const d2 = h - hfield[i - hw], d3 = h - hfield[i + hw];
+        // свежая борозда за кромкой не принимает материал — иначе кажется,
+        // что скребок не догрёб до дна
+        const o0 = !wall[i - 1] && frameNo - clearedAt[i - 1] > hold;
+        const o1 = !wall[i + 1] && frameNo - clearedAt[i + 1] > hold;
+        const o2 = !wall[i - hw] && frameNo - clearedAt[i - hw] > hold;
+        const o3 = !wall[i + hw] && frameNo - clearedAt[i + hw] > hold;
+
+        let total = 0;
+        if (o0 && d0 > talus) total += d0 - talus;
+        if (o1 && d1 > talus) total += d1 - talus;
+        if (o2 && d2 > talus) total += d2 - talus;
+        if (o3 && d3 > talus) total += d3 - talus;
+        if (total <= 0) continue;
+        const give = Math.min(mobile, total * kk) / total;
+        if (o0 && d0 > talus) { const m = (d0 - talus) * give; hfield[i] -= m; hfield[i - 1] += m; loose[i - 1] = 1; }
+        if (o1 && d1 > talus) { const m = (d1 - talus) * give; hfield[i] -= m; hfield[i + 1] += m; loose[i + 1] = 1; }
+        if (o2 && d2 > talus) { const m = (d2 - talus) * give; hfield[i] -= m; hfield[i - hw] += m; loose[i - hw] = 1; }
+        if (o3 && d3 > talus) { const m = (d3 - talus) * give; hfield[i] -= m; hfield[i + hw] += m; loose[i + hw] = 1; }
+      }
+    }
+  }
+  for (let i = 0; i < loose.length; i++) loose[i] *= decay;
+  collapseDust();
+}
+
+// Континуум оставляет в клетках бесконечно малые остатки, и рендер честно
+// рисует каждый как отдельное зерно — поле покрывается пылью. Настоящий песок
+// дискретен: меньше зерна не бывает. Крошки уходят к самому полному соседу.
+function collapseDust() {
+  const dust = P.dust;
+  if (dust <= 0) return;
+  for (let y = 1; y < hh - 1; y++) {
+    for (let x = 1; x < hw - 1; x++) {
+      const i = y * hw + x;
+      const h = hfield[i];
+      if (h <= 0 || h >= dust) continue;
+      let best = -1, bestH = 0;
+      const n0 = hfield[i - 1], n1 = hfield[i + 1], n2 = hfield[i - hw], n3 = hfield[i + hw];
+      if (n0 > bestH) { bestH = n0; best = i - 1; }
+      if (n1 > bestH) { bestH = n1; best = i + 1; }
+      if (n2 > bestH) { bestH = n2; best = i - hw; }
+      if (n3 > bestH) { bestH = n3; best = i + hw; }
+      if (best < 0 || bestH < dust) continue;   // одинокое зерно остаётся лежать
+      hfield[best] += h;
+      hfield[i] = 0;
+    }
+  }
+}
+
+// свободные зёрна тормозятся и оседают обратно в поле — масса не теряется
+function hybridFree() {
+  let alive = 0;
+  for (let i = 0; i < nFree; i++) {
+    let x = fx[i] + fvx[i], y = fy[i] + fvy[i];
+    let vx = fvx[i] * 0.82, vy = fvy[i] * 0.82;
+    const cx = (x / HC) | 0, cy = (y / HC) | 0;
+    const out = cx < 1 || cy < 1 || cx >= hw - 1 || cy >= hh - 1;
+    if (out || Math.hypot(vx, vy) < 0.22) {
+      if (!out) { hfield[cy * hw + cx] += FREE_MASS; loose[cy * hw + cx] = 1; }
+      continue;
+    }
+    fx[alive] = x; fy[alive] = y; fvx[alive] = vx; fvy[alive] = vy;
+    alive++;
+  }
+  nFree = alive;
+}
+
+// ═════════════════════════════ РЕНДЕР ════════════════════════════════════
+let image = null, pixels = null;
+const BG = 0xfff1f4f4 | 0;      // ABGR: #f4f4f1
+
+function makeImage() {
+  image = ctx.createImageData(W, H);
+  pixels = new Uint32Array(image.data.buffer);
+}
+
+function put(x, y, color) {
+  const xi = x | 0, yi = y | 0;
+  if (xi < 0 || yi < 0 || xi >= W - 1 || yi >= H - 1) return;
+  const i = yi * W + xi;
+  pixels[i] = color; pixels[i + 1] = color;
+  pixels[i + W] = color; pixels[i + W + 1] = color;
+}
+
+function shade(v) {                       // v 0..1 → чёрный по плотности
+  const g = Math.round(190 - 175 * Math.min(1, v));
+  return (0xff000000 | (g << 16) | (g << 8) | g) >>> 0;
+}
+
+// зерно рисуется на собственной сетке, а не на клетке симуляции — иначе
+// проступает решётка поля
+function renderHeight() {
+  pixels.fill(BG);
+  const nx = Math.ceil(W / GRAIN), ny = Math.ceil(H / GRAIN);
+  const k = GRAIN / CELL;
+  for (let y = 0; y < ny; y++) {
+    const fy = y * k;
+    const y0 = fy | 0, ty = fy - y0;
+    if (y0 >= gh - 1) continue;
+    for (let x = 0; x < nx; x++) {
+      const fx = x * k;
+      const x0 = fx | 0, tx = fx - x0;
+      if (x0 >= gw - 1) continue;
+      const i = y0 * gw + x0;
+      const h = field[i] * (1 - tx) * (1 - ty) + field[i + 1] * tx * (1 - ty)
+              + field[i + gw] * (1 - tx) * ty + field[i + gw + 1] * tx * ty;
+      if (h < 0.015) continue;
+      if (h < 0.9 && hash(x, y) > h / 0.9) continue;
+      const jx = (hash(x + 7919, y) - 0.5) * GRAIN * 1.15;
+      const jy = (hash(x, y + 104729) - 0.5) * GRAIN * 1.15;
+      put(x * GRAIN + jx, y * GRAIN + jy, shade(0.30 + h * 0.42));
+    }
+  }
+  ctx.putImageData(image, 0, 0);
+}
+
+function renderGrains() {
+  pixels.fill(BG);
+  for (let i = 0; i < nGrains; i++) {
+    const cx = (gx[i] / GRAIN) | 0, cy = (gy[i] / GRAIN) | 0;
+    let d = 1;
+    if (cx >= 0 && cy >= 0 && cx < cw && cy < ch) d = count[cy * cw + cx];
+    put(gx[i], gy[i], shade(0.2 + d * 0.16));
+  }
+  ctx.putImageData(image, 0, 0);
+}
+
+// три способа показать высоту — плотность, боковой свет, подъём с тенью
+function renderHybrid() {
+  pixels.fill(BG);
+  const nx = Math.ceil(W / GRAIN), ny = Math.ceil(H / GRAIN);
+  const k = GRAIN / HC;
+  const relief = P.relief;
+  const lift = P.lift;
+
+  for (let y = 0; y < ny; y++) {
+    const fyc = y * k;
+    const y0 = fyc | 0, ty = fyc - y0;
+    if (y0 >= hh - 2) continue;
+    for (let x = 0; x < nx; x++) {
+      const fxc = x * k;
+      const x0 = fxc | 0, tx = fxc - x0;
+      if (x0 >= hw - 2 || x0 < 1 || y0 < 1) continue;
+      const i = y0 * hw + x0;
+      const h = hfield[i] * (1 - tx) * (1 - ty) + hfield[i + 1] * tx * (1 - ty)
+              + hfield[i + hw] * (1 - tx) * ty + hfield[i + hw + 1] * tx * ty;
+      if (h < 0.015) continue;
+      if (h < 0.9 && hash(x, y) > h / 0.9) continue;
+
+      const jx = (hash(x + 7919, y) - 0.5) * GRAIN * 1.15;
+      const jy = (hash(x, y + 104729) - 0.5) * GRAIN * 1.15;
+      let px = x * GRAIN + jx, py = y * GRAIN + jy;
+      let tone = 0.22 + (1 - Math.exp(-h * 0.45)) * 0.72;
+
+      if (relief === 'light') {
+        // боковой свет с северо-запада по уклону поля
+        const gx1 = hfield[i + 1] - hfield[i - 1];
+        const gy1 = hfield[i + hw] - hfield[i - hw];
+        tone = clamp(0.46 - (gx1 + gy1) * 0.55, 0.04, 1);
+      } else if (relief === 'lift') {
+        const rise = h * lift;
+        // видна только та часть боковой стенки, которую не закрывает сосед
+        // снизу — иначе зёрна повисают в воздухе вместо грани
+        const below = hfield[i + hw] * (1 - tx) + hfield[i + hw + 1] * tx;
+        const face = Math.max(0, h - below) * lift;
+        if (rise > 1.2) put(px + rise * 0.30, py + rise * 0.06, SHADOW);
+        for (let r = GRAIN; r < face; r += GRAIN) {
+          put(px + (hash(x + r, y) - 0.5) * GRAIN, py - rise + r, shade(tone * 0.62));
+        }
+        py -= rise;
+      }
+
+      put(px, py, shade(tone));
+    }
+  }
+
+  for (let i = 0; i < nFree; i++) put(fx[i], fy[i], GRAIN_DARK);
+  ctx.putImageData(image, 0, 0);
+}
+
+const SHADOW = (0xff000000 | (206 << 16) | (206 << 8) | 206) >>> 0;
+const GRAIN_DARK = (0xff000000 | (26 << 16) | (26 << 8) | 26) >>> 0;
+function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+
+function drawTool() {
+  const a = P.angle * Math.PI / 180;
+  const hx = Math.cos(a) * P.len * 0.5, hy = Math.sin(a) * P.len * 0.5;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = tool.down ? 'rgba(17,17,17,.85)' : 'rgba(17,17,17,.3)';
+  ctx.lineWidth = tool.down ? 3 : 2;
+  ctx.beginPath();
+  ctx.moveTo(tool.x - hx, tool.y - hy);
+  ctx.lineTo(tool.x + hx, tool.y + hy);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ═════════════════════════════ ЦИКЛ ══════════════════════════════════════
+let last = performance.now(), fps = 60;
+
+function frame(now) {
+  const dt = now - last; last = now;
+  fps += ((1000 / Math.max(dt, 1)) - fps) * 0.08;
+
+  frameNo++;
+  applyKeys(Math.min(dt, 50) / 1000);
+
+  if (mode === 'height') {
+    if (tool.down) heightBlade(tool.px, tool.py, tool.x, tool.y);
+    heightRelax();
+    renderHeight();
+    hud.textContent = `${Math.round(fps)} fps · масса ${sum(field).toFixed(0)} · сетка ${gw}×${gh}`;
+  } else if (mode === 'grains') {
+    if (tool.down) grainsBlade(tool.px, tool.py, tool.x, tool.y);
+    grainsRelax();
+    renderGrains();
+    hud.textContent = `${Math.round(fps)} fps · зёрен ${nGrains}`;
+  } else {
+    if (tool.down) hybridBlade(tool.px, tool.py, tool.x, tool.y);
+    stampWall();
+    hybridRelax();
+    hybridFree();
+    renderHybrid();
+    hud.textContent = `${Math.round(fps)} fps · масса ` +
+      `${(sum(hfield) + nFree * FREE_MASS).toFixed(0)} · в воздухе ${nFree}`;
+  }
+
+  tool.px = tool.x; tool.py = tool.y;
+  drawTool();
+}
+
+function sum(arr) { let s = 0; for (let i = 0; i < arr.length; i++) s += arr[i]; return s; }
+
+// ═════════════════════════════ ВВОД ══════════════════════════════════════
+canvas.addEventListener('pointermove', e => {
+  tool.x = e.clientX; tool.y = e.clientY;
+});
+canvas.addEventListener('pointerdown', e => {
+  canvas.setPointerCapture(e.pointerId);
+  tool.x = tool.px = e.clientX; tool.y = tool.py = e.clientY;
+  tool.down = true;
+});
+addEventListener('pointerup', () => { tool.down = false; });
+addEventListener('pointercancel', () => { tool.down = false; });
+
+// ═════════════════════════════ UI ════════════════════════════════════════
+const ui = {};
+function bind(id, key, fmt) {
+  const el = document.getElementById(id), out = document.getElementById('v-' + id);
+  ui[key] = { el, out, fmt };
+  const sync = () => { P[key] = Number(el.value); out.textContent = fmt(P[key]); };
+  el.addEventListener('input', sync); sync();
+}
+
+function setParam(key, value) {
+  const u = ui[key];
+  const v = clamp(value, Number(u.el.min), Number(u.el.max));
+  P[key] = v; u.el.value = v; u.out.textContent = u.fmt(v);
+}
+
+// ── клавиши под левой рукой ─────────────────────────────────────────────
+const keys = new Set();
+const HOTKEYS = ['KeyQ', 'KeyW', 'KeyE', 'KeyR', 'KeyA', 'KeyS', 'KeyD'];
+
+addEventListener('keydown', e => {
+  if (!HOTKEYS.includes(e.code)) return;   // по code — не зависит от раскладки
+  e.preventDefault();
+  if (e.repeat) return;
+  keys.add(e.code);
+  paintKeys();
+  if (e.code === 'KeyE') snapAngle(-45);
+  else if (e.code === 'KeyR') snapAngle(45);
+
+});
+addEventListener('keyup', e => { keys.delete(e.code); paintKeys(); });
+addEventListener('blur', () => { keys.clear(); paintKeys(); });
+
+const legendKeys = [...document.querySelectorAll('#legend kbd')];
+function paintKeys() {
+  for (const el of legendKeys) {
+    el.classList.toggle('on', keys.has('Key' + el.textContent));
+  }
+}
+
+function snapAngle(delta) {
+  const snapped = Math.round(P.angle / 45) * 45 + delta;
+  setParam('angle', (snapped % 180 + 180) % 180);
+}
+
+function applyKeys(dt) {
+  const rot = 75 * dt, grow = 260 * dt;
+  if (keys.has('KeyA')) pour(dt);
+  if (keys.has('KeyQ')) setParam('angle', ((P.angle - rot) % 180 + 180) % 180);
+  if (keys.has('KeyW')) setParam('angle', (P.angle + rot) % 180);
+  if (keys.has('KeyS')) setParam('len', P.len - grow);
+  if (keys.has('KeyD')) setParam('len', P.len + grow);
+}
+bind('angle', 'angle', v => v + '°');
+bind('len', 'len', v => v);
+bind('talus', 'talus', v => v.toFixed(2));
+bind('relax', 'relax', v => v.toFixed(2));
+bind('settle', 'settle', v => v.toFixed(2));
+bind('spray', 'spray', v => v.toFixed(1));
+bind('dust', 'dust', v => v.toFixed(2));
+bind('cohesion', 'cohesion', v => v.toFixed(1));
+bind('pour', 'pour', v => String(v));
+bind('lift', 'lift', v => v.toFixed(1));
+
+document.querySelectorAll('.modes.relief button').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.modes.relief button').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    P.relief = b.dataset.relief;
+  });
+});
+
+document.querySelectorAll('.modes button').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    mode = b.dataset.mode;
+    note.textContent = NOTES[mode];
+  });
+});
+
+document.getElementById('reset').addEventListener('click', () => setup(true));
+// песок сыплется струйкой, пока держишь клавишу
+function pour(dt) {
+  const amount = P.pour * dt;
+  if (mode === 'grains') {
+    const n = Math.round(amount * 0.45);
+    for (let i = 0; i < n && nGrains < MAX_GRAINS; i++) {
+      const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * 7;
+      gx[nGrains] = tool.x + Math.cos(a) * d;
+      gy[nGrains] = tool.y + Math.sin(a) * d;
+      nGrains++;
+    }
+    return;
+  }
+
+  const cell = mode === 'height' ? CELL : HC;
+  const w = mode === 'height' ? gw : hw, h = mode === 'height' ? gh : hh;
+  const target = mode === 'height' ? field : hfield;
+  const cx = tool.x / cell, cy = tool.y / cell;
+  const spread = 9 / cell;
+
+  // разбрасываем порцию по случайным точкам — струя ложится неровно, как живая
+  const drops = 14;
+  for (let i = 0; i < drops; i++) {
+    const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * spread;
+    const x = Math.round(cx + Math.cos(a) * d), y = Math.round(cy + Math.sin(a) * d);
+    if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
+    target[y * w + x] += amount / drops;
+    if (mode === 'hybrid') loose[y * w + x] = 1;
+  }
+
+  if (mode === 'hybrid' && nFree < MAX_FREE - 3) {
+    for (let i = 0; i < 2; i++) {
+      const a = Math.random() * Math.PI * 2;
+      fx[nFree] = tool.x + Math.cos(a) * 5;
+      fy[nFree] = tool.y + Math.sin(a) * 5;
+      fvx[nFree] = (Math.random() - 0.5) * 1.4;
+      fvy[nFree] = (Math.random() - 0.5) * 1.4;
+      nFree++;
+    }
+  }
+}
+
+function addSand() {
+  if (mode === 'height') heightPile(tool.x / CELL, tool.y / CELL, Math.min(gw, gh) * 0.09, 4.2);
+  else if (mode === 'grains') grainsPile(tool.x, tool.y, Math.min(W, H) * 0.08, 9000);
+  else hybridPile(tool.x / HC, tool.y / HC, Math.min(hw, hh) * 0.09, 4);
+}
+document.getElementById('add').addEventListener('click', addSand);
+document.getElementById('fold').addEventListener('click', e => {
+  const p = document.getElementById('panel');
+  p.classList.toggle('collapsed');
+  e.target.textContent = p.classList.contains('collapsed') ? '+' : '–';
+});
+
+// стабильный шум по координате
+function hash(x, y) {
+  let h = (x | 0) * 374761393 + (y | 0) * 668265263;
+  h = (h ^ (h >> 13)) * 1274126177;
+  return ((h ^ (h >> 16)) >>> 0) / 4294967296;
+}
+
+function setup(fresh) {
+  W = innerWidth; H = innerHeight;
+  canvas.width = W; canvas.height = H;
+  makeImage();
+  heightInit(fresh);
+  grainsInit(fresh);
+  hybridInit(fresh);
+}
+
+addEventListener('resize', () => setup(true));
+note.textContent = NOTES[mode];
+setup(true);
+tool.x = tool.px = W * 0.5; tool.y = tool.py = H * 0.72;
+window.__dbg = { setup: 'ok' };
+window.__lab = {
+  tool, P,
+  stroke(x0, y0, x1, y1, steps = 24) {
+    tool.x = tool.px = x0; tool.y = tool.py = y0; tool.down = true;
+    for (let s = 1; s <= steps; s++) {
+      const t = s / steps;
+      tool.x = x0 + (x1 - x0) * t; tool.y = y0 + (y1 - y0) * t;
+      if (mode === 'height') heightBlade(tool.px, tool.py, tool.x, tool.y);
+      else if (mode === 'grains') grainsBlade(tool.px, tool.py, tool.x, tool.y);
+      else { hybridBlade(tool.px, tool.py, tool.x, tool.y); stampWall(); hybridRelax(); hybridFree(); }
+      tool.px = tool.x; tool.py = tool.y;
+      frameNo++;
+    }
+    tool.down = false;
+    if (mode === 'hybrid') stampWall();
+  },
+  settle(n = 60) {
+    for (let i = 0; i < n; i++) {
+      frameNo++;
+      if (mode === 'height') heightRelax();
+      else if (mode === 'grains') grainsRelax();
+      else { hybridRelax(); hybridFree(); }
+    }
+  },
+  setMode(m) { mode = m; },
+  pour(dt) { pour(dt); },
+  clear() { hfield.fill(0); loose.fill(0); nFree = 0; },
+  // масса в круге — чтобы проверять, чисто ли дно за кромкой
+  probe(xPx, yPx, rPx) {
+    const cx = xPx / HC, cy = yPx / HC, r = rPx / HC;
+    let s = 0;
+    for (let y = Math.max(1, Math.floor(cy - r)); y <= Math.min(hh - 2, Math.ceil(cy + r)); y++)
+      for (let x = Math.max(1, Math.floor(cx - r)); x <= Math.min(hw - 2, Math.ceil(cx + r)); x++)
+        if (Math.hypot(x - cx, y - cy) <= r) s += hfield[y * hw + x];
+    return +s.toFixed(2);
+  },
+  // ширина следа на заданной высоте — по массе, а не на глаз
+  widthAt(yPx) {
+    const y = Math.round(yPx / HC);
+    if (y < 0 || y >= hh) return null;
+    let first = -1, last = -1, mass = 0;
+    for (let x = 0; x < hw; x++) {
+      const h = hfield[y * hw + x];
+      if (h < 0.05) continue;
+      if (first < 0) first = x;
+      last = x; mass += h;
+    }
+    return first < 0 ? { width: 0, mass: 0 } : { width: (last - first + 1) * HC, mass: +mass.toFixed(1) };
+  },
+  reset() { setup(true); }
+};
+function loop(now) {
+  try { frame(now); } catch (err) { window.__dbg.err = String(err && err.stack || err); return; }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
