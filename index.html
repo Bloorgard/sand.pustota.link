@@ -31,6 +31,7 @@
     button { font: inherit; }
 
     #sand {
+      cursor: none;
       position: fixed;
       inset: 0;
       display: block;
@@ -132,47 +133,6 @@
       width: 30px;
       font: 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
       text-align: right;
-    }
-
-    .card-tool {
-      position: fixed;
-      z-index: 2;
-      left: 0;
-      top: 0;
-      width: 150px;
-      height: 26px;
-      border: 1px solid rgba(24, 26, 28, .68);
-      border-radius: 3px 3px 2px 2px;
-      background: linear-gradient(180deg, #f2f2ee 0%, #c8c9c7 62%, #989b9d 100%);
-      box-shadow: 0 13px 18px rgba(20, 22, 24, .24), inset 0 1px rgba(255,255,255,.72);
-      transform: translate(-50%, -50%);
-      transform-origin: 50% 50%;
-      pointer-events: none;
-      opacity: 1;
-      will-change: transform;
-    }
-
-    .card-tool.pressed { filter: brightness(.9); }
-
-    .card-tool::before {
-      content: "";
-      position: absolute;
-      left: 4px;
-      right: 4px;
-      bottom: 3px;
-      height: 2px;
-      border-radius: 1px;
-      background: rgba(26, 28, 30, .5);
-    }
-
-    .card-tool::after {
-      content: "";
-      position: absolute;
-      left: 10%;
-      right: 10%;
-      top: 5px;
-      height: 1px;
-      background: rgba(255,255,255,.56);
     }
 
     .physics {
@@ -504,7 +464,6 @@
   <header class="topbar">
     <div class="brand">
       <strong>sand.pustota.link</strong>
-      <span>конечная горсть · скребок 01</span>
     </div>
     <div class="controls">
       <div class="actions tool-group" role="group" aria-label="Скребок">
@@ -528,7 +487,6 @@
     </div>
   </header>
 
-  <div id="card" class="card-tool" aria-hidden="true"></div>
   <div id="hint" class="hint">проведи скребком через кучку</div>
   <div id="status" class="status" aria-live="polite"></div>
 
@@ -559,7 +517,6 @@
 
     const canvas = document.querySelector('#sand');
     const context = canvas.getContext('2d', { alpha: false, desynchronized: true });
-    const card = document.querySelector('#card');
     const hint = document.querySelector('#hint');
     const status = document.querySelector('#status');
     const resetButton = document.querySelector('#reset');
@@ -754,13 +711,14 @@
       engine.tick();
 
       SandRender.draw(target, engine, style);
+      drawTool();
 
       if (Math.floor(now / 800) !== Math.floor((now - elapsed) / 800)) updateStatus();
       requestAnimationFrame(tick);
     }
 
     function exportImage() {
-      SandRender.draw(target, engine, style);
+      SandRender.draw(target, engine, style);   // без скребка: он не часть работы
       canvas.toBlob(blob => {
         if (!blob) return;
         const link = document.createElement('a');
@@ -831,8 +789,8 @@
     }
 
     function clampToolScreen(x, y, angle) {
-      const width = Number.parseFloat(card.style.width) || 150;
-      const height = 26;
+      const width = toolLength;
+      const height = 6;
       const radians = angle * Math.PI / 180;
       const halfX = Math.abs(Math.cos(radians)) * width * 0.5 + Math.abs(Math.sin(radians)) * height * 0.5;
       const halfY = Math.abs(Math.sin(radians)) * width * 0.5 + Math.abs(Math.cos(radians)) * height * 0.5;
@@ -846,11 +804,25 @@
       const screen = clampToolScreen(x, y, angle);
       toolPose.x = screen.x;
       toolPose.y = screen.y;
-      card.style.transform = `translate(${screen.x}px, ${screen.y}px) translate(-50%, -50%) rotate(${angle}deg)`;
     }
 
-    function updateCardWidth() {
-      card.style.width = `${toolLength}px`;
+    // Скребок — линия на холсте, а не элемент страницы: карточка с градиентом
+    // и тенью спорила с зерном, линия честнее показывает, где кромка.
+    function drawTool() {
+      const scale = target.scale;
+      const radians = toolAngle * Math.PI / 180;
+      const hx = Math.cos(radians) * toolLength * 0.5 * scale;
+      const hy = Math.sin(radians) * toolLength * 0.5 * scale;
+      const x = toolPose.x * scale, y = toolPose.y * scale;
+      context.save();
+      context.lineCap = 'round';
+      context.strokeStyle = tool.down ? 'rgba(26, 28, 30, .85)' : 'rgba(26, 28, 30, .3)';
+      context.lineWidth = (tool.down ? 3 : 2) * scale;
+      context.beginPath();
+      context.moveTo(x - hx, y - hy);
+      context.lineTo(x + hx, y + hy);
+      context.stroke();
+      context.restore();
     }
 
     function setToolAngle(value, persist = true) {
@@ -869,7 +841,6 @@
       lengthInput.value = String(toolLength);
       lengthValue.value = String(toolLength);
       lengthValue.textContent = String(toolLength);
-      updateCardWidth();
       placeCard(toolPose.x, toolPose.y, toolAngle);
       if (persist) {
         try { localStorage.setItem(LENGTH_KEY, String(toolLength)); } catch (_) {}
@@ -885,7 +856,6 @@
       tool.x = tool.px = start.x;
       tool.y = tool.py = start.y;
       tool.down = true;
-      card.classList.add('pressed');
       placeCard(start.x, start.y, toolAngle);
       if (!hiddenHint) {
         hint.classList.add('hidden');
@@ -913,7 +883,6 @@
       if (activePointer !== event.pointerId) return;
       activePointer = null;
       tool.down = false;
-      card.classList.remove('pressed');
       scheduleSave(1000);
     }
 
