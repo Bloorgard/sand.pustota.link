@@ -2,3 +2,7 @@ artifacts/
 .DS_Store
 Thumbs.db
 *.log
+
+# проверочные сборки со встроенными скриптами
+*.check.html
+.check.html
