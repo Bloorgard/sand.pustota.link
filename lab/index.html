@@ -133,6 +133,7 @@
 </div>
 
 <script src="../engine/sand.js"></script>
+<script src="../engine/render.js"></script>
 
 <script>
 (() => {
@@ -455,12 +456,21 @@ function renderGrains() {
   ctx.putImageData(image, 0, 0);
 }
 
-// три способа показать высоту — плотность, боковой свет, подъём с тенью
+// Плотность и свет рисует общий рендер, «подъём» остаётся здесь: на основной
+// странице он не используется, а как условная проекция живёт только в стенде.
+let target = null;
+
 function renderHybrid() {
+  if (P.relief === 'lift') { renderLift(); return; }
+  if (!target || target.width !== canvas.width || target.height !== canvas.height)
+    target = SandRender.createTarget(ctx, canvas.width, canvas.height);
+  SandRender.draw(target, engine, P.relief === 'light' ? 'light' : 'plain');
+}
+
+function renderLift() {
   pixels.fill(BG);
   const nx = Math.ceil(W / GRAIN), ny = Math.ceil(H / GRAIN);
   const k = GRAIN / HC;
-  const relief = P.relief;
   const lift = P.lift;
 
   for (let y = 0; y < ny; y++) {
@@ -480,26 +490,17 @@ function renderHybrid() {
       const jx = (hash(x + 7919, y) - 0.5) * GRAIN * 1.15;
       const jy = (hash(x, y + 104729) - 0.5) * GRAIN * 1.15;
       let px = x * GRAIN + jx, py = y * GRAIN + jy;
-      let tone = 0.22 + (1 - Math.exp(-h * 0.45)) * 0.72;
+      const tone = 0.22 + (1 - Math.exp(-h * 0.45)) * 0.72;
 
-      if (relief === 'light') {
-        // боковой свет с северо-запада по уклону поля
-        const gx1 = hfield[i + 1] - hfield[i - 1];
-        const gy1 = hfield[i + hw] - hfield[i - hw];
-        tone = clamp(0.46 - (gx1 + gy1) * 0.55, 0.04, 1);
-      } else if (relief === 'lift') {
-        const rise = h * lift;
-        // видна только та часть боковой стенки, которую не закрывает сосед
-        // снизу — иначе зёрна повисают в воздухе вместо грани
-        const below = hfield[i + hw] * (1 - tx) + hfield[i + hw + 1] * tx;
-        const face = Math.max(0, h - below) * lift;
-        if (rise > 1.2) put(px + rise * 0.30, py + rise * 0.06, SHADOW);
-        for (let r = GRAIN; r < face; r += GRAIN) {
-          put(px + (hash(x + r, y) - 0.5) * GRAIN, py - rise + r, shade(tone * 0.62));
-        }
-        py -= rise;
+      const rise = h * lift;
+      // видна только та часть боковой стенки, которую не закрывает сосед снизу
+      const below = hfield[i + hw] * (1 - tx) + hfield[i + hw + 1] * tx;
+      const face = Math.max(0, h - below) * lift;
+      if (rise > 1.2) put(px + rise * 0.30, py + rise * 0.06, SHADOW);
+      for (let r = GRAIN; r < face; r += GRAIN) {
+        put(px + (hash(x + r, y) - 0.5) * GRAIN, py - rise + r, shade(tone * 0.62));
       }
-
+      py -= rise;
       put(px, py, shade(tone));
     }
   }
