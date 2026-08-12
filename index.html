@@ -9,7 +9,7 @@
   <style>
     :root {
       color-scheme: light;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
       --ink: #111111;
       --table: #f4f4f1;
       --glass: rgba(244, 244, 241, .84);
@@ -74,29 +74,17 @@
       opacity: .54;
     }
 
-    .controls {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-      gap: 10px;
-      pointer-events: none;
-    }
-
     .actions {
       display: flex;
-      overflow: hidden;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      background: var(--glass);
-      backdrop-filter: blur(9px);
       pointer-events: auto;
     }
 
     .actions button {
-      min-height: 38px;
-      padding: 0 13px;
+      min-height: 32px;
+      padding: 0 2px;
       border: 0;
-      border-right: 1px solid var(--line);
+      border-bottom: 1px solid rgba(26, 28, 30, .22);
+      opacity: .7;
       color: inherit;
       background: transparent;
       font-size: 11px;
@@ -109,17 +97,38 @@
     .actions button:hover, .actions button:focus-visible { background: rgba(255,255,255,.14); }
     .actions button:focus-visible { outline: 2px solid var(--ink); outline-offset: -3px; }
 
+    /* Контролы скребка — под рукой, внизу по центру, без рамки: отступ от
+       ползунка до подписи и до значения одинаковый. */
+    .tool-group {
+      position: fixed;
+      z-index: 3;
+      left: 50%;
+      bottom: max(52px, calc(env(safe-area-inset-bottom) + 52px));
+      transform: translateX(-50%);
+      display: flex;
+      gap: 28px;
+      pointer-events: auto;
+    }
+
     .parameter-control {
       display: flex;
       align-items: center;
-      gap: 8px;
-      min-height: 38px;
-      padding: 0 12px;
-      border-right: 1px solid var(--line);
+      gap: 10px;
       font-size: 10px;
       letter-spacing: .08em;
       text-transform: uppercase;
       white-space: nowrap;
+      opacity: .72;
+    }
+
+    .parameter-control input {
+      width: 112px;
+    }
+
+    .parameter-control output {
+      width: 30px;
+      font: 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      text-align: right;
     }
 
     .parameter-control input {
@@ -129,11 +138,7 @@
       cursor: ew-resize;
     }
 
-    .angle-value {
-      width: 30px;
-      font: 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-      text-align: right;
-    }
+
 
     .physics {
       position: fixed;
@@ -150,6 +155,30 @@
       border-radius: 12px;
       background: rgba(244, 244, 241, .86);
       backdrop-filter: blur(10px);
+    }
+
+    .style-switch {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      margin-bottom: 12px;
+    }
+
+    .style-switch button {
+      padding: 6px 4px;
+      border: 1px solid rgba(26, 28, 30, .16);
+      border-radius: 7px;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .style-switch button[aria-pressed="true"] {
+      background: #1a1c1e;
+      border-color: #1a1c1e;
+      color: #f4f4f1;
     }
 
     /* display: grid перебивает браузерное правило для [hidden] */
@@ -188,19 +217,23 @@
     .legend {
       position: fixed;
       z-index: 3;
-      right: max(20px, env(safe-area-inset-right));
-      bottom: calc(max(22px, env(safe-area-inset-bottom)) + 26px);
-      display: grid;
-      gap: 5px;
-      opacity: .4;
+      left: 50%;
+      bottom: max(20px, env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 3px 14px;
+      opacity: .32;
+      font-size: 10px;
+      letter-spacing: .04em;
       user-select: none;
       pointer-events: none;
     }
 
-    .legend div {
-      display: flex;
+    .legend span {
+      display: inline-flex;
       align-items: center;
-      justify-content: flex-end;
       gap: 4px;
     }
 
@@ -215,12 +248,7 @@
       font: 500 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
     }
 
-    .legend i {
-      font-style: normal;
-      font-size: 10.5px;
-      margin-left: 4px;
-      min-width: 54px;
-    }
+
 
     /* на узком экране клавиатуры нет, а легенда налезает на подсказку */
     @media (max-width: 720px) {
@@ -231,7 +259,7 @@
       position: fixed;
       z-index: 3;
       left: 50%;
-      bottom: max(25px, env(safe-area-inset-bottom));
+      bottom: max(104px, calc(env(safe-area-inset-bottom) + 104px));
       transform: translateX(-50%);
       padding: 9px 13px;
       border: 1px solid rgba(26, 28, 30, .15);
@@ -283,6 +311,30 @@
       backdrop-filter: blur(10px);
     }
 
+    .style-switch {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      margin-bottom: 12px;
+    }
+
+    .style-switch button {
+      padding: 6px 4px;
+      border: 1px solid rgba(26, 28, 30, .16);
+      border-radius: 7px;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .style-switch button[aria-pressed="true"] {
+      background: #1a1c1e;
+      border-color: #1a1c1e;
+      color: #f4f4f1;
+    }
+
     /* display: grid перебивает браузерное правило для [hidden] */
     .physics[hidden] { display: none; }
 
@@ -319,19 +371,23 @@
     .legend {
       position: fixed;
       z-index: 3;
-      right: max(20px, env(safe-area-inset-right));
-      bottom: calc(max(22px, env(safe-area-inset-bottom)) + 26px);
-      display: grid;
-      gap: 5px;
-      opacity: .4;
+      left: 50%;
+      bottom: max(20px, env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 3px 14px;
+      opacity: .32;
+      font-size: 10px;
+      letter-spacing: .04em;
       user-select: none;
       pointer-events: none;
     }
 
-    .legend div {
-      display: flex;
+    .legend span {
+      display: inline-flex;
       align-items: center;
-      justify-content: flex-end;
       gap: 4px;
     }
 
@@ -346,12 +402,7 @@
       font: 500 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
     }
 
-    .legend i {
-      font-style: normal;
-      font-size: 10.5px;
-      margin-left: 4px;
-      min-width: 54px;
-    }
+
 
     /* на узком экране клавиатуры нет, а легенда налезает на подсказку */
     @media (max-width: 720px) {
@@ -379,6 +430,30 @@
       backdrop-filter: blur(10px);
     }
 
+    .style-switch {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      margin-bottom: 12px;
+    }
+
+    .style-switch button {
+      padding: 6px 4px;
+      border: 1px solid rgba(26, 28, 30, .16);
+      border-radius: 7px;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .style-switch button[aria-pressed="true"] {
+      background: #1a1c1e;
+      border-color: #1a1c1e;
+      color: #f4f4f1;
+    }
+
     /* display: grid перебивает браузерное правило для [hidden] */
     .physics[hidden] { display: none; }
 
@@ -415,19 +490,23 @@
     .legend {
       position: fixed;
       z-index: 3;
-      right: max(20px, env(safe-area-inset-right));
-      bottom: calc(max(22px, env(safe-area-inset-bottom)) + 26px);
-      display: grid;
-      gap: 5px;
-      opacity: .4;
+      left: 50%;
+      bottom: max(20px, env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 3px 14px;
+      opacity: .32;
+      font-size: 10px;
+      letter-spacing: .04em;
       user-select: none;
       pointer-events: none;
     }
 
-    .legend div {
-      display: flex;
+    .legend span {
+      display: inline-flex;
       align-items: center;
-      justify-content: flex-end;
       gap: 4px;
     }
 
@@ -442,12 +521,7 @@
       font: 500 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
     }
 
-    .legend i {
-      font-style: normal;
-      font-size: 10.5px;
-      margin-left: 4px;
-      min-width: 54px;
-    }
+
 
     /* на узком экране клавиатуры нет, а легенда налезает на подсказку */
     @media (max-width: 720px) {
@@ -465,33 +539,33 @@
     <div class="brand">
       <strong>sand.pustota.link</strong>
     </div>
-    <div class="controls">
-      <div class="actions tool-group" role="group" aria-label="Скребок">
-        <label class="parameter-control angle-control" for="angle">
-          <span>угол</span>
-          <input id="angle" type="range" min="0" max="180" step="1" value="45">
-          <output id="angle-value" class="angle-value" for="angle">45°</output>
-        </label>
-        <label class="parameter-control length-control" for="length">
-          <span>длина</span>
-          <input id="length" type="range" min="70" max="240" step="5" value="150">
-          <output id="length-value" class="angle-value" for="length">150</output>
-        </label>
-      </div>
-      <nav class="actions" aria-label="Действия">
-        <button id="style" type="button" aria-pressed="false" title="Чёрно-белая графика или боковой свет">свет</button>
-        <button id="add-sand" type="button">досыпать</button>
-        <button id="reset" type="button">сбросить</button>
-        <button id="export" type="button">экспорт</button>
-      </nav>
-    </div>
+    <nav class="actions" aria-label="Действия">
+      <button id="export" type="button">экспорт</button>
+    </nav>
   </header>
+
+  <div class="tool-group" role="group" aria-label="Скребок">
+    <label class="parameter-control" for="angle">
+      <span>угол</span>
+      <input id="angle" type="range" min="0" max="180" step="1" value="45">
+      <output id="angle-value" for="angle">45°</output>
+    </label>
+    <label class="parameter-control" for="length">
+      <span>длина</span>
+      <input id="length" type="range" min="20" max="240" step="5" value="150">
+      <output id="length-value" for="length">150</output>
+    </label>
+  </div>
 
   <div id="hint" class="hint">проведи скребком через кучку</div>
   <div id="status" class="status" aria-live="polite"></div>
 
   <aside id="physics" class="physics" hidden aria-label="Настройки материала">
     <b>материал</b>
+    <div class="style-switch" role="group" aria-label="Графика">
+      <button type="button" data-style="plain" aria-pressed="true">плоский</button>
+      <button type="button" data-style="light" aria-pressed="false">свет</button>
+    </div>
     <label><span>откос</span><output>2.05</output><input type="range" id="p-talus" min="0" max="3" step="0.05" value="2.05"></label>
     <label><span>осыпание</span><output>0.24</output><input type="range" id="p-relax" min="0" max="0.25" step="0.01" value="0.24"></label>
     <label><span>слёживание</span><output>0.17</output><input type="range" id="p-settle" min="0" max="0.3" step="0.01" value="0.17"></label>
@@ -501,11 +575,12 @@
   </aside>
 
   <div id="legend" class="legend" aria-hidden="true">
-    <div><kbd>Q</kbd><kbd>W</kbd><i>поворот</i></div>
-    <div><kbd>E</kbd><kbd>R</kbd><i>шаг 45°</i></div>
-    <div><kbd>S</kbd><kbd>D</kbd><i>длина</i></div>
-    <div><kbd>A</kbd><i>сыпать</i></div>
-    <div><kbd>`</kbd><i>материал</i></div>
+    <span><kbd>Q</kbd><kbd>W</kbd> поворот</span>
+    <span><kbd>⇧</kbd> шаг 45°</span>
+    <span><kbd>S</kbd><kbd>D</kbd> длина</span>
+    <span><kbd>A</kbd> сыпать</span>
+    <span><kbd>X</kbd> сброс</span>
+    <span><kbd>`</kbd> материал</span>
   </div>
 
   <script src="engine/sand.js"></script>
@@ -519,14 +594,12 @@
     const context = canvas.getContext('2d', { alpha: false, desynchronized: true });
     const hint = document.querySelector('#hint');
     const status = document.querySelector('#status');
-    const resetButton = document.querySelector('#reset');
     const exportButton = document.querySelector('#export');
-    const addSandButton = document.querySelector('#add-sand');
     const angleInput = document.querySelector('#angle');
     const angleValue = document.querySelector('#angle-value');
     const lengthInput = document.querySelector('#length');
     const lengthValue = document.querySelector('#length-value');
-    const styleButton = document.querySelector('#style');
+    const styleButtons = document.querySelectorAll('.style-switch button');
     const physics = document.querySelector('#physics');
 
     const SAVE_KEY = 'sand.pustota.sculpt06';
@@ -539,6 +612,7 @@
     let engine = null;
     let target = null;
     let initialMass = 0;
+    let baseMass = 0;      // масса первой раздачи: с ней сравнивается досыпанное
     let style = 'plain';   // по умолчанию плоская графика, свет включается кнопкой
 
     let activePointer = null;
@@ -577,7 +651,7 @@
       const rawLength = localStorage.getItem(LENGTH_KEY);
       if (rawLength !== null) {
         const storedLength = Number(rawLength);
-        if (Number.isFinite(storedLength)) toolLength = clamp(storedLength, 70, 240);
+        if (Number.isFinite(storedLength)) toolLength = clamp(storedLength, 20, 240);
       }
     } catch (_) {}
 
@@ -588,15 +662,15 @@
     canvas.addEventListener('pointermove', onPointerMove);
     canvas.addEventListener('pointerup', event => finishPointer(event, false));
     canvas.addEventListener('pointercancel', event => finishPointer(event, true));
-    resetButton.addEventListener('click', resetSand);
-    addSandButton.addEventListener('click', addSandAtTool);
     exportButton.addEventListener('click', exportImage);
     angleInput.addEventListener('input', () => setToolAngle(Number(angleInput.value)));
     lengthInput.addEventListener('input', () => setToolLength(Number(lengthInput.value)));
-    styleButton.addEventListener('click', () => {
-      style = style === 'light' ? 'plain' : 'light';
-      applyStyle();
-    });
+    for (const button of styleButtons) {
+      button.addEventListener('click', () => {
+        style = button.dataset.style;
+        applyStyle();
+      });
+    }
     setToolAngle(toolAngle, false);
     setToolLength(toolLength, false);
     applyStyle();
@@ -604,7 +678,8 @@
     requestAnimationFrame(tick);
 
     function applyStyle() {
-      styleButton.setAttribute('aria-pressed', style === 'light' ? 'true' : 'false');
+      for (const button of styleButtons)
+        button.setAttribute('aria-pressed', button.dataset.style === style ? 'true' : 'false');
       try { localStorage.setItem(STYLE_KEY, style); } catch (_) {}
     }
 
@@ -625,7 +700,7 @@
 
     // ── клавиши под левой рукой, по event.code — работают в любой раскладке ──
     const keys = new Set();
-    const HOTKEYS = ['KeyQ', 'KeyW', 'KeyE', 'KeyR', 'KeyA', 'KeyS', 'KeyD'];
+    const HOTKEYS = ['KeyQ', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyX'];
 
     addEventListener('keydown', event => {
       if (event.code === 'Backquote') {
@@ -636,9 +711,11 @@
       if (!HOTKEYS.includes(event.code)) return;
       event.preventDefault();
       if (event.repeat) return;
+      // с шифтом поворот идёт щелчками по 45°, без него — плавно
+      if (event.shiftKey && event.code === 'KeyQ') { snapAngle(-45); return; }
+      if (event.shiftKey && event.code === 'KeyW') { snapAngle(45); return; }
+      if (event.code === 'KeyX') { resetSand(); return; }
       keys.add(event.code);
-      if (event.code === 'KeyE') snapAngle(-45);
-      else if (event.code === 'KeyR') snapAngle(45);
     });
     addEventListener('keyup', event => {
       if (!keys.delete(event.code)) return;
@@ -685,8 +762,9 @@
       const saved = forceFresh ? null : loadState();
       if (saved) engine.field.set(saved);
       else engine.pile(innerWidth * 0.5, innerHeight * 0.5,
-                       Math.min(innerWidth, innerHeight) * 0.12, 7);
+                       Math.min(innerWidth, innerHeight) * 0.135, 8.5);
       initialMass = engine.mass();
+      if (!baseMass) baseMass = initialMass;
       dirty = false;
     }
 
@@ -729,16 +807,19 @@
       }, 'image/png');
     }
 
-    // Цифры не должны дёргаться на пустом месте: процент показывается с одним
-    // знаком, а кадры — только когда их мало и это стоит знать.
+    // Масса сохраняется, поэтому «100% песка» — не новость, а шум. Строка
+    // молчит, пока сказать нечего: говорит о досыпанном песке и о просадке.
     let lastStatus = '';
 
     function updateStatus() {
       const average = frameTimes.length ? frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length : 16.7;
       const fps = Math.round(1000 / Math.max(average, 1));
       const mass = engine.mass();
-      const massPercent = initialMass ? Math.round(mass / initialMass * 1000) / 10 : 100;
-      const text = fps < 45 ? `${massPercent}% песка · ${fps} fps` : `${massPercent}% песка`;
+      const parts = [];
+      if (baseMass && mass > baseMass * 1.02)
+        parts.push(`песка ×${(mass / baseMass).toFixed(1)}`);
+      if (fps < 45) parts.push(`${fps} fps`);
+      const text = parts.join(' · ');
       if (text === lastStatus) return;
       lastStatus = text;
       status.textContent = text;
@@ -837,7 +918,7 @@
     }
 
     function setToolLength(value, persist = true) {
-      toolLength = clamp(Math.round((Number(value) || 70) / 5) * 5, 70, 240);
+      toolLength = clamp(Math.round((Number(value) || 20) / 5) * 5, 20, 240);
       lengthInput.value = String(toolLength);
       lengthValue.value = String(toolLength);
       lengthValue.textContent = String(toolLength);
