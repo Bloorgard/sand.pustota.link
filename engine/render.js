@@ -40,23 +40,28 @@
     return (0xff000000 | (g << 16) | (g << 8) | g) >>> 0;
   }
 
-  function createTarget(ctx, widthPx, heightPx) {
+  // scale — пикселей канваса на CSS-пиксель: на ретине холст крупнее страницы,
+  // и зерно должно расти вместе с ним, иначе картинка мельчает вдвое
+  function createTarget(ctx, widthPx, heightPx, scale) {
     const image = ctx.createImageData(widthPx, heightPx);
     return {
       ctx, image,
       pixels: new Uint32Array(image.data.buffer),
-      width: widthPx, height: heightPx
+      width: widthPx, height: heightPx,
+      scale: scale || 1
     };
   }
 
   function put(target, x, y, color) {
+    const size = target.grainPx;
     const xi = x | 0, yi = y | 0;
     const w = target.width;
-    if (xi < 0 || yi < 0 || xi >= w - 1 || yi >= target.height - 1) return;
-    const i = yi * w + xi;
+    if (xi < 0 || yi < 0 || xi + size > w || yi + size > target.height) return;
     const px = target.pixels;
-    px[i] = color; px[i + 1] = color;
-    px[i + w] = color; px[i + w + 1] = color;
+    for (let dy = 0; dy < size; dy++) {
+      const row = (yi + dy) * w + xi;
+      for (let dx = 0; dx < size; dx++) px[row + dx] = color;
+    }
   }
 
   // Зерно ставится на собственной сетке, а не на клетке симуляции: иначе
@@ -67,8 +72,10 @@
     px.fill(BG);
 
     const field = engine.field, cols = engine.cols, rows = engine.rows;
-    const nx = Math.ceil(target.width / GRAIN);
-    const ny = Math.ceil(target.height / GRAIN);
+    const scale = target.scale;
+    target.grainPx = Math.max(2, Math.round(2 * scale));
+    const nx = Math.ceil(target.width / (GRAIN * scale));
+    const ny = Math.ceil(target.height / (GRAIN * scale));
     const k = GRAIN / engine.cell;
     const needsSlope = styleName === 'light';
 
@@ -98,12 +105,13 @@
 
         const jx = (hash(x + 7919, y) - 0.5) * GRAIN * 1.15;
         const jy = (hash(x, y + 104729) - 0.5) * GRAIN * 1.15;
-        put(target, x * GRAIN + jx, y * GRAIN + jy, shade(tone));
+        put(target, (x * GRAIN + jx) * scale, (y * GRAIN + jy) * scale, shade(tone));
       }
     }
 
     const free = engine.free;
-    for (let i = 0; i < free.count; i++) put(target, free.x[i], free.y[i], GRAIN_DARK);
+    for (let i = 0; i < free.count; i++)
+      put(target, free.x[i] * scale, free.y[i] * scale, GRAIN_DARK);
 
     target.ctx.putImageData(target.image, 0, 0);
   }
