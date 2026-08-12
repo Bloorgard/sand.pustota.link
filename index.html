@@ -75,6 +75,8 @@
 
     .actions {
       display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
       overflow: hidden;
       border: 1px solid var(--line);
       border-radius: 999px;
@@ -85,7 +87,7 @@
 
     .actions button {
       min-height: 38px;
-      padding: 0 15px;
+      padding: 0 13px;
       border: 0;
       border-right: 1px solid var(--line);
       color: inherit;
@@ -167,6 +169,90 @@
       background: rgba(255,255,255,.56);
     }
 
+    .physics {
+      position: fixed;
+      z-index: 4;
+      left: max(18px, env(safe-area-inset-left));
+      bottom: max(58px, env(safe-area-inset-bottom));
+      width: 232px;
+      max-height: 64vh;
+      overflow-y: auto;
+      display: grid;
+      gap: 2px;
+      padding: 12px 14px;
+      border: 1px solid rgba(26, 28, 30, .15);
+      border-radius: 12px;
+      background: rgba(244, 244, 241, .86);
+      backdrop-filter: blur(10px);
+    }
+
+    .physics b {
+      font-size: 10px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      opacity: .5;
+      margin-bottom: 6px;
+    }
+
+    .physics label {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 2px 8px;
+      margin-bottom: 7px;
+      font-size: 11px;
+      opacity: .75;
+    }
+
+    .physics input {
+      grid-column: 1 / -1;
+      width: 100%;
+      margin-top: 1px;
+      accent-color: #1a1c1e;
+    }
+
+    .physics output {
+      font-variant-numeric: tabular-nums;
+      opacity: .8;
+    }
+
+    .legend {
+      position: fixed;
+      z-index: 3;
+      right: max(20px, env(safe-area-inset-right));
+      bottom: calc(max(22px, env(safe-area-inset-bottom)) + 26px);
+      display: grid;
+      gap: 5px;
+      opacity: .4;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .legend div {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+    }
+
+    .legend kbd {
+      display: inline-grid;
+      place-items: center;
+      min-width: 19px;
+      height: 19px;
+      padding: 0 4px;
+      border: 1px solid rgba(26, 28, 30, .22);
+      border-radius: 4px;
+      font: 500 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .legend i {
+      font-style: normal;
+      font-size: 10.5px;
+      margin-left: 4px;
+      min-width: 54px;
+    }
+
     .hint {
       position: fixed;
       z-index: 3;
@@ -200,17 +286,185 @@
     @media (max-width: 620px) {
       .topbar { flex-direction: column; align-items: stretch; gap: 12px; }
       .brand span { display: none; }
-      .actions { align-self: stretch; display: grid; grid-template-columns: 1fr 1fr 1fr; border-radius: 22px; }
+      .actions { align-self: stretch; display: grid; grid-template-columns: 1fr 1fr; border-radius: 22px; }
       .parameter-control { grid-column: 1 / -1; min-height: 36px; padding: 0 12px; border-right: 0; border-bottom: 1px solid var(--line); }
       .parameter-control input { flex: 1; width: auto; }
       .actions button { min-height: 36px; padding: 0 12px; font-size: 10px; }
 
       .status { left: max(18px, env(safe-area-inset-left)); right: auto; bottom: max(14px, env(safe-area-inset-bottom)); }
-      .hint { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 23px); }
+      .physics {
+      position: fixed;
+      z-index: 4;
+      left: max(18px, env(safe-area-inset-left));
+      bottom: max(58px, env(safe-area-inset-bottom));
+      width: 232px;
+      max-height: 64vh;
+      overflow-y: auto;
+      display: grid;
+      gap: 2px;
+      padding: 12px 14px;
+      border: 1px solid rgba(26, 28, 30, .15);
+      border-radius: 12px;
+      background: rgba(244, 244, 241, .86);
+      backdrop-filter: blur(10px);
+    }
+
+    .physics b {
+      font-size: 10px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      opacity: .5;
+      margin-bottom: 6px;
+    }
+
+    .physics label {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 2px 8px;
+      margin-bottom: 7px;
+      font-size: 11px;
+      opacity: .75;
+    }
+
+    .physics input {
+      grid-column: 1 / -1;
+      width: 100%;
+      margin-top: 1px;
+      accent-color: #1a1c1e;
+    }
+
+    .physics output {
+      font-variant-numeric: tabular-nums;
+      opacity: .8;
+    }
+
+    .legend {
+      position: fixed;
+      z-index: 3;
+      right: max(20px, env(safe-area-inset-right));
+      bottom: calc(max(22px, env(safe-area-inset-bottom)) + 26px);
+      display: grid;
+      gap: 5px;
+      opacity: .4;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .legend div {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+    }
+
+    .legend kbd {
+      display: inline-grid;
+      place-items: center;
+      min-width: 19px;
+      height: 19px;
+      padding: 0 4px;
+      border: 1px solid rgba(26, 28, 30, .22);
+      border-radius: 4px;
+      font: 500 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .legend i {
+      font-style: normal;
+      font-size: 10.5px;
+      margin-left: 4px;
+      min-width: 54px;
+    }
+
+    .hint { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 23px); }
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .hint { transition: none; }
+      .physics {
+      position: fixed;
+      z-index: 4;
+      left: max(18px, env(safe-area-inset-left));
+      bottom: max(58px, env(safe-area-inset-bottom));
+      width: 232px;
+      max-height: 64vh;
+      overflow-y: auto;
+      display: grid;
+      gap: 2px;
+      padding: 12px 14px;
+      border: 1px solid rgba(26, 28, 30, .15);
+      border-radius: 12px;
+      background: rgba(244, 244, 241, .86);
+      backdrop-filter: blur(10px);
+    }
+
+    .physics b {
+      font-size: 10px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      opacity: .5;
+      margin-bottom: 6px;
+    }
+
+    .physics label {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 2px 8px;
+      margin-bottom: 7px;
+      font-size: 11px;
+      opacity: .75;
+    }
+
+    .physics input {
+      grid-column: 1 / -1;
+      width: 100%;
+      margin-top: 1px;
+      accent-color: #1a1c1e;
+    }
+
+    .physics output {
+      font-variant-numeric: tabular-nums;
+      opacity: .8;
+    }
+
+    .legend {
+      position: fixed;
+      z-index: 3;
+      right: max(20px, env(safe-area-inset-right));
+      bottom: calc(max(22px, env(safe-area-inset-bottom)) + 26px);
+      display: grid;
+      gap: 5px;
+      opacity: .4;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .legend div {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+    }
+
+    .legend kbd {
+      display: inline-grid;
+      place-items: center;
+      min-width: 19px;
+      height: 19px;
+      padding: 0 4px;
+      border: 1px solid rgba(26, 28, 30, .22);
+      border-radius: 4px;
+      font: 500 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .legend i {
+      font-style: normal;
+      font-size: 10.5px;
+      margin-left: 4px;
+      min-width: 54px;
+    }
+
+    .hint { transition: none; }
     }
   </style>
 </head>
@@ -233,6 +487,7 @@
         <input id="length" type="range" min="70" max="240" step="5" value="150">
         <output id="length-value" class="angle-value" for="length">150</output>
       </label>
+      <button id="style" type="button" aria-pressed="false">свет</button>
       <button id="add-sand" type="button">досыпать</button>
       <button id="reset" type="button">сбросить</button>
       <button id="export" type="button">экспорт</button>
@@ -242,6 +497,23 @@
   <div id="card" class="card-tool" aria-hidden="true"></div>
   <div id="hint" class="hint">проведи скребком через кучку</div>
   <div id="status" class="status" aria-live="polite"></div>
+
+  <aside id="physics" class="physics" hidden aria-label="Настройки материала">
+    <b>материал</b>
+    <label><span>откос</span><output>2.05</output><input type="range" id="p-talus" min="0" max="3" step="0.05" value="2.05"></label>
+    <label><span>осыпание</span><output>0.24</output><input type="range" id="p-relax" min="0" max="0.25" step="0.01" value="0.24"></label>
+    <label><span>слёживание</span><output>0.17</output><input type="range" id="p-settle" min="0" max="0.3" step="0.01" value="0.17"></label>
+    <label><span>сцепление</span><output>3.5</output><input type="range" id="p-cohesion" min="0" max="8" step="0.1" value="3.5"></label>
+    <label><span>высота лезвия</span><output>26</output><input type="range" id="p-blade" min="4" max="200" step="2" value="26"></label>
+    <label><span>россыпь</span><output>0.3</output><input type="range" id="p-spray" min="0" max="3" step="0.1" value="0.3"></label>
+  </aside>
+
+  <div id="legend" class="legend" aria-hidden="true">
+    <div><kbd>Q</kbd><kbd>W</kbd><i>поворот</i></div>
+    <div><kbd>E</kbd><kbd>R</kbd><i>шаг 45°</i></div>
+    <div><kbd>S</kbd><kbd>D</kbd><i>длина</i></div>
+    <div><kbd>A</kbd><i>сыпать</i></div>
+  </div>
 
   <script src="engine/sand.js"></script>
   <script src="engine/render.js"></script>
@@ -262,17 +534,20 @@
     const angleValue = document.querySelector('#angle-value');
     const lengthInput = document.querySelector('#length');
     const lengthValue = document.querySelector('#length-value');
+    const styleButton = document.querySelector('#style');
+    const physics = document.querySelector('#physics');
 
     const SAVE_KEY = 'sand.pustota.sculpt06';
     const ANGLE_KEY = 'sand.pustota.scraper-angle';
     const LENGTH_KEY = 'sand.pustota.scraper-length';
+    const STYLE_KEY = 'sand.pustota.style';
     const MAX_HEIGHT = 64.0;        // потолок упаковки: вал доходит до сорока
     const SAVE_VERSION = 3;
 
     let engine = null;
     let target = null;
     let initialMass = 0;
-    let style = 'plain';
+    let style = 'plain';   // по умолчанию плоская графика, свет включается кнопкой
 
     let activePointer = null;
     let dirty = false;
@@ -290,6 +565,10 @@
     // и к моменту отрисовки вести уже нечего.
     const pending = [];
     const toolPose = { x: innerWidth * 0.72, y: innerHeight * 0.72 };
+
+    try {
+      if (localStorage.getItem(STYLE_KEY) === 'light') style = 'light';
+    } catch (_) {}
 
     try {
       const rawAngle = localStorage.getItem(ANGLE_KEY);
@@ -319,9 +598,76 @@
     exportButton.addEventListener('click', exportImage);
     angleInput.addEventListener('input', () => setToolAngle(Number(angleInput.value)));
     lengthInput.addEventListener('input', () => setToolLength(Number(lengthInput.value)));
+    styleButton.addEventListener('click', () => {
+      style = style === 'light' ? 'plain' : 'light';
+      applyStyle();
+    });
     setToolAngle(toolAngle, false);
     setToolLength(toolLength, false);
+    applyStyle();
+    bindPhysicsPanel();
     requestAnimationFrame(tick);
+
+    function applyStyle() {
+      styleButton.setAttribute('aria-pressed', style === 'light' ? 'true' : 'false');
+      try { localStorage.setItem(STYLE_KEY, style); } catch (_) {}
+    }
+
+    // Панель материала — инструмент отладки: значения не сохраняются между
+    // сессиями, рабочая калибровка живёт в значениях по умолчанию движка.
+    function bindPhysicsPanel() {
+      for (const input of physics.querySelectorAll('input')) {
+        const key = input.id.slice(2);          // p-talus → talus
+        const out = input.parentElement.querySelector('output');
+        const sync = () => {
+          engine.params[key] = Number(input.value);
+          out.textContent = input.value;
+        };
+        input.addEventListener('input', sync);
+        sync();
+      }
+    }
+
+    // ── клавиши под левой рукой, по event.code — работают в любой раскладке ──
+    const keys = new Set();
+    const HOTKEYS = ['KeyQ', 'KeyW', 'KeyE', 'KeyR', 'KeyA', 'KeyS', 'KeyD'];
+
+    addEventListener('keydown', event => {
+      if (event.code === 'Backquote') {
+        event.preventDefault();
+        physics.hidden = !physics.hidden;
+        return;
+      }
+      if (!HOTKEYS.includes(event.code)) return;
+      event.preventDefault();
+      if (event.repeat) return;
+      keys.add(event.code);
+      if (event.code === 'KeyE') snapAngle(-45);
+      else if (event.code === 'KeyR') snapAngle(45);
+    });
+    addEventListener('keyup', event => {
+      if (!keys.delete(event.code)) return;
+      // при удержании параметры не пишутся в хранилище каждый кадр —
+      // сохраняем один раз, когда клавишу отпустили
+      if (event.code === 'KeyQ' || event.code === 'KeyW') setToolAngle(toolAngle);
+      if (event.code === 'KeyS' || event.code === 'KeyD') setToolLength(toolLength);
+    });
+    addEventListener('blur', () => keys.clear());
+
+    function snapAngle(delta) {
+      const snapped = Math.round(toolAngle / 45) * 45 + delta;
+      setToolAngle((snapped % 180 + 180) % 180);
+    }
+
+    function applyKeys(dt) {
+      if (!keys.size) return;
+      const rot = 75 * dt, grow = 260 * dt;
+      if (keys.has('KeyA')) { engine.pour(toolPose.x, toolPose.y, dt); scheduleSave(900); }
+      if (keys.has('KeyQ')) setToolAngle(((toolAngle - rot) % 180 + 180) % 180, false);
+      if (keys.has('KeyW')) setToolAngle((toolAngle + rot) % 180, false);
+      if (keys.has('KeyS')) setToolLength(toolLength - grow, false);
+      if (keys.has('KeyD')) setToolLength(toolLength + grow, false);
+    }
 
     function resizeCanvas() {
       const dpr = Math.min(devicePixelRatio || 1, 2);
@@ -354,6 +700,8 @@
       lastFrameTime = now;
       frameTimes.push(elapsed);
       if (frameTimes.length > 36) frameTimes.shift();
+
+      applyKeys(Math.min(elapsed, 50) / 1000);
 
       if (pending.length) {
         for (const point of pending) {
