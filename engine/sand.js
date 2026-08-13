@@ -32,6 +32,10 @@
     return ((h ^ (h >> 16)) >>> 0) / 4294967296;
   }
 
+  // порядок: 4 прямых соседа, затем 4 диагональных
+  const NEIGHBOUR = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+  const DIAGONAL = [1, 1, 1, 1, 1.41, 1.41, 1.41, 1.41];
+
   function create(widthPx, heightPx, options) {
     const params = Object.assign({}, DEFAULTS, options);
     const cell = params.cell;
@@ -227,6 +231,8 @@
     }
 
     // осыпание, затухающее по мере слёживания
+    const share = new Float64Array(8);
+
     function relax() {
       const talus = params.talus, k = params.relax, hold = params.hold;
       const coh = params.cohesion;
@@ -255,26 +261,27 @@
             }
             const kk = k * live;
 
-            const d0 = h - field[i - 1], d1 = h - field[i + 1];
-            const d2 = h - field[i - cols], d3 = h - field[i + cols];
-            // свежая борозда за кромкой не принимает материал — иначе кажется,
-            // что скребок не догрёб до дна
-            const o0 = !wall[i - 1] && frameNo - clearedAt[i - 1] > hold;
-            const o1 = !wall[i + 1] && frameNo - clearedAt[i + 1] > hold;
-            const o2 = !wall[i - cols] && frameNo - clearedAt[i - cols] > hold;
-            const o3 = !wall[i + cols] && frameNo - clearedAt[i + cols] > hold;
-
+            // Восемь соседей, а не четыре. По четырём материал растекается по
+            // манхэттенской метрике, и любая насыпь выходит ромбом. У диагонали
+            // порог круче во столько, во сколько она длиннее.
             let total = 0;
-            if (o0 && d0 > crit) total += d0 - crit;
-            if (o1 && d1 > crit) total += d1 - crit;
-            if (o2 && d2 > crit) total += d2 - crit;
-            if (o3 && d3 > crit) total += d3 - crit;
+            for (let n = 0; n < 8; n++) {
+              const idx = i + NEIGHBOUR[n][0] + NEIGHBOUR[n][1] * cols;
+              if (wall[idx] || frameNo - clearedAt[idx] <= hold) { share[n] = 0; continue; }
+              const d = (h - field[idx]) - crit * DIAGONAL[n];
+              share[n] = d > 0 ? d : 0;
+              total += share[n];
+            }
             if (total <= 0) continue;
             const give = Math.min(mobile, total * kk) / total;
-            if (o0 && d0 > crit) { const m = (d0 - crit) * give; field[i] -= m; field[i - 1] += m; loose[i - 1] = 1; }
-            if (o1 && d1 > crit) { const m = (d1 - crit) * give; field[i] -= m; field[i + 1] += m; loose[i + 1] = 1; }
-            if (o2 && d2 > crit) { const m = (d2 - crit) * give; field[i] -= m; field[i - cols] += m; loose[i - cols] = 1; }
-            if (o3 && d3 > crit) { const m = (d3 - crit) * give; field[i] -= m; field[i + cols] += m; loose[i + cols] = 1; }
+            for (let n = 0; n < 8; n++) {
+              if (share[n] <= 0) continue;
+              const idx = i + NEIGHBOUR[n][0] + NEIGHBOUR[n][1] * cols;
+              const m = share[n] * give;
+              field[i] -= m;
+              field[idx] += m;
+              loose[idx] = 1;
+            }
           }
         }
       }
