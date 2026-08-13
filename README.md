@@ -65,6 +65,8 @@ python3 -m http.server 4173
 
 ```text
 index.html        страница: инструмент, экспорт, сохранение
+favicon-*.png     иконка: буква из зерна, свет по уклону
+apple-touch-icon.png
 engine/sand.js    движок песка, общий для обеих страниц
 engine/render.js  отрисовка зерном, реестр стилей
 lab/index.html    лаборатория: сравнение движков песка
