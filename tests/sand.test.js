@@ -57,15 +57,31 @@ test('тонкий слой выгребается дочиста', () => {
     `путь не выгребен: ${before.toFixed(0)} → ${after.toFixed(0)}`);
 });
 
-test('вал не обрушивается после жеста', () => {
-  const e = create(600, 900);
+// Вал вровень с кромкой держится намертво; чем выше лезвие, тем выше вал и
+// тем больше он оседает — но всё равно остаётся выше низкого.
+test('вал вровень с кромкой не обрушивается', () => {
+  const e = create(600, 900, { blade: 26 });
   setLine(e, 300, 2, 100);
   stroke(e, 300, 270, 300, 630, 120, 0, 300);
   const peak = probe(e, 300, 638, 6);
   settle(e, 200);
   const after = probe(e, 300, 638, 6);
-  assert.ok(after > peak * 0.7,
+  assert.ok(after > peak * 0.95,
     `вал осыпался: ${peak.toFixed(0)} → ${after.toFixed(0)}`);
+});
+
+test('высокое лезвие несёт больше песка, не пачкая путь', () => {
+  function run(blade) {
+    const e = create(600, 900, { blade });
+    setLine(e, 300, 2, 100);
+    stroke(e, 300, 270, 300, 630, 120, 0, 300);
+    settle(e, 200);
+    return { ridge: probe(e, 300, 638, 6), track: probe(e, 300, 405, 40) };
+  }
+  const low = run(26), high = run(60);
+  assert.ok(high.ridge > low.ridge,
+    `высокое лезвие принесло не больше: ${low.ridge.toFixed(0)} → ${high.ridge.toFixed(0)}`);
+  assert.ok(high.track < 5, `путь за высоким лезвием грязный: ${high.track.toFixed(1)}`);
 });
 
 test('движение вдоль лезвия не двигает песок', () => {

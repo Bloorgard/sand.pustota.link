@@ -113,6 +113,12 @@
       display: flex;
       align-items: center;
       gap: 10px;
+      /* важна вертикаль ползунков, подпись подстраивается под неё */
+    }
+
+    .parameter-control > span {
+      min-width: 44px;
+      text-align: right;
       font-size: 10px;
       letter-spacing: .08em;
       text-transform: uppercase;
@@ -532,14 +538,14 @@
     </button>
     <div class="panel-body" id="physics-body">
     <div class="style-switch" role="group" aria-label="Графика">
-      <button type="button" data-style="plain" aria-pressed="true">плоский</button>
-      <button type="button" data-style="light" aria-pressed="false">свет</button>
+      <button type="button" data-style="plain" aria-pressed="false">плоский</button>
+      <button type="button" data-style="light" aria-pressed="true">свет</button>
     </div>
     <label><span>откос</span><output>2.05</output><input type="range" id="p-talus" min="0" max="3" step="0.05" value="2.05"></label>
     <label><span>осыпание</span><output>0.24</output><input type="range" id="p-relax" min="0" max="0.25" step="0.01" value="0.24"></label>
     <label><span>слёживание</span><output>0.17</output><input type="range" id="p-settle" min="0" max="0.3" step="0.01" value="0.17"></label>
     <label><span>сцепление</span><output>3.5</output><input type="range" id="p-cohesion" min="0" max="8" step="0.1" value="3.5"></label>
-    <label><span>высота лезвия</span><output>26</output><input type="range" id="p-blade" min="4" max="200" step="2" value="26"></label>
+    <label><span>высота лезвия</span><output>60</output><input type="range" id="p-blade" min="4" max="200" step="2" value="60"></label>
     <label><span>россыпь</span><output>0.3</output><input type="range" id="p-spray" min="0" max="3" step="0.1" value="0.3"></label>
     <label><span>струя</span><output>2600</output><input type="range" id="p-pour" min="400" max="12000" step="100" value="2600"></label>
     </div>
@@ -555,6 +561,7 @@
       <div class="key"><span><kbd>S</kbd><kbd>D</kbd></span> длина</div>
       <div class="key"><span><kbd>A</kbd></span> сыпать</div>
       <div class="key"><span><kbd>X</kbd></span> очистить</div>
+      <div class="key"><span><kbd>⌘Z</kbd></span> отменить</div>
       <div class="key"><span><kbd>`</kbd></span> материал</div>
     </div>
   </aside>
@@ -590,7 +597,7 @@
     let target = null;
     let initialMass = 0;
     let baseMass = 0;      // масса первой раздачи: с ней сравнивается досыпанное
-    let style = 'plain';   // по умолчанию плоская графика, свет включается кнопкой
+    let style = 'light';
 
     let activePointer = null;
     let dirty = false;
@@ -603,6 +610,14 @@
 
     // скребок: где он и ведут ли его прямо сейчас
     const tool = { x: 0, y: 0, px: 0, py: 0, down: false };
+    // История для отката. Снимок поля — это 500 КБ на шаг, а жест меняет
+    // около двух процентов клеток, поэтому храним разницу: индекс и прежнее
+    // значение. Двадцать шагов укладываются в единицы сотен килобайт.
+    const UNDO_DEPTH = 20;
+    const history = [];
+    let strokeStart = null;
+    let commitTimer = 0;
+
     // Отрезки жеста, накопленные между кадрами. Без очереди быстрый штрих
     // пропадает целиком: down, move и up успевают пройти до ближайшего кадра,
     // и к моменту отрисовки вести уже нечего.
@@ -610,7 +625,7 @@
     const toolPose = { x: innerWidth * 0.72, y: innerHeight * 0.72 };
 
     try {
-      if (localStorage.getItem(STYLE_KEY) === 'light') style = 'light';
+      if (localStorage.getItem(STYLE_KEY) === 'plain') style = 'plain';
     } catch (_) {}
 
     try {
@@ -701,6 +716,11 @@
     const HOTKEYS = ['KeyQ', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyX'];
 
     addEventListener('keydown', event => {
+      if (event.code === 'KeyZ' && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        undo();
+        return;
+      }
       if (event.code === 'Backquote') {
         event.preventDefault();
         const toggle = physics.querySelector('.panel-toggle');
@@ -719,6 +739,7 @@
       keys.add(event.code);
     });
     addEventListener('keyup', event => {
+      if (event.code === 'KeyA') scheduleCommit();
       if (!keys.delete(event.code)) return;
       // при удержании параметры не пишутся в хранилище каждый кадр —
       // сохраняем один раз, когда клавишу отпустили
@@ -736,6 +757,7 @@
       if (!keys.size) return;
       const rot = 75 * dt, grow = 260 * dt;
       if (keys.has('KeyA')) {
+        if (!strokeStart) beginHistory();
         engine.pour(toolPose.x, toolPose.y, dt);
         if (!baseMass) baseMass = engine.mass();
         scheduleSave(900);
@@ -863,8 +885,10 @@
     }
 
     function resetSand() {
+      beginHistory();
       try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
       engine.clear();
+      commitHistory();
       initialMass = 0;
       baseMass = 0;
       dirty = true;
@@ -936,9 +960,53 @@
       }
     }
 
+    function beginHistory() {
+      // начался новый жест — предыдущий записываем немедленно
+      if (commitTimer) { clearTimeout(commitTimer); commitTimer = 0; commitHistory(); }
+      strokeStart = engine.field.slice();
+    }
+
+    // Шаг записывается не в момент отпускания, а когда песок уляжется: жест —
+    // это действие вместе с его последствиями, иначе откат вернёт середину
+    // осыпания и оставит поле не тем, что было.
+    function scheduleCommit() {
+      clearTimeout(commitTimer);
+      commitTimer = setTimeout(() => { commitTimer = 0; commitHistory(); }, 700);
+    }
+
+    function commitHistory() {
+      if (!strokeStart) return;
+      const before = strokeStart;
+      strokeStart = null;
+      const field = engine.field;
+      if (before.length !== field.length) return;   // размер сменился, откат не свяжется
+      const index = [], value = [];
+      for (let i = 0; i < field.length; i++) {
+        if (before[i] === field[i]) continue;
+        index.push(i); value.push(before[i]);
+      }
+      if (!index.length) return;
+      history.push({ index: Int32Array.from(index), value: Float32Array.from(value) });
+      if (history.length > UNDO_DEPTH) history.shift();
+    }
+
+    function undo() {
+      if (commitTimer) { clearTimeout(commitTimer); commitTimer = 0; commitHistory(); }
+      const step = history.pop();
+      if (!step) return;
+      engine.free.count = 0;      // зёрна в полёте досыпали бы массу поверх отката
+      const field = engine.field;
+      if (step.index.length && step.index[step.index.length - 1] >= field.length) return;
+      for (let i = 0; i < step.index.length; i++) field[step.index[i]] = step.value[i];
+      dirty = true;
+      updateInvite();
+      scheduleSave(600);
+    }
+
     function onPointerDown(event) {
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       event.preventDefault();
+      beginHistory();
       try { canvas.setPointerCapture(event.pointerId); } catch (_) {}
       activePointer = event.pointerId;
       const start = clampToolScreen(event.clientX, event.clientY, toolAngle);
@@ -967,6 +1035,7 @@
       if (activePointer !== event.pointerId) return;
       activePointer = null;
       tool.down = false;
+      scheduleCommit();
       scheduleSave(1000);
     }
 
