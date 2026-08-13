@@ -71,10 +71,13 @@
       wallDirty = false;
       free.count = 0;
 
+      liveX0 = 0; liveY0 = 0; liveX1 = -1; liveY1 = -1;
       if (prevField) {
         const w = Math.min(prevCols, cols), h = Math.min(prevRows, rows);
         for (let y = 0; y < h; y++)
           field.set(prevField.subarray(y * prevCols, y * prevCols + w), y * cols);
+        for (let i = 0; i < field.length; i++) if (field[i] > 0) loose[i] = 1;
+        touchArea(1, 1, w - 1, h - 1);
       }
 
       engine.cols = cols;
@@ -88,11 +91,14 @@
       const w = Math.min(sourceCols, cols), h = Math.min(sourceRows, rows);
       for (let y = 0; y < h; y++)
         field.set(source.subarray(y * sourceCols, y * sourceCols + w), y * cols);
+      for (let i = 0; i < field.length; i++) if (field[i] > 0) loose[i] = 1;
+      touchArea(1, 1, w - 1, h - 1);
     }
 
     function clear() {
       field.fill(0); loose.fill(0); clearedAt.fill(-9999);
       wall.fill(0); wallDirty = false; free.count = 0;
+      liveX0 = 0; liveY0 = 0; liveX1 = -1; liveY1 = -1;
     }
 
     function mass() {
@@ -113,6 +119,7 @@
           field[y * cols + x] += peak * (1 - d * d) * (0.85 + hash(x, y) * 0.3);
           loose[y * cols + x] = 1;
         }
+      touchArea(x0, y0, x1, y1);
     }
 
     // струя: масса ложится неровно по случайным точкам, как живая
@@ -127,6 +134,7 @@
         if (x < 1 || y < 1 || x >= cols - 1 || y >= rows - 1) continue;
         field[y * cols + x] += amount / drops;
         loose[y * cols + x] = 1;
+        touch(x, y);
       }
     }
 
@@ -166,6 +174,7 @@
       field[i + 1] += amount * w1;        loose[i + 1] = 1;
       field[i + cols] += amount * w2;     loose[i + cols] = 1;
       field[i + cols + 1] += amount * w3; loose[i + cols + 1] = 1;
+      touchArea(x0, y0, x0 + 1, y0 + 1);
     }
 
     function blade(ax, ay, bx, by, angleDeg, lengthPx) {
@@ -212,6 +221,7 @@
             field[si] = 0;
             clearedAt[si] = frameNo;
             carried += have;
+            touch(sx, sy);
 
             // часть материала срывается с кромки настоящими зёрнами
             if (free.count < params.maxFree - 1 && carried > params.freeMass &&
@@ -253,20 +263,45 @@
     // осыпание, затухающее по мере слёживания
     const share = new Float64Array(8);
 
+    // Осыпание обходило всё поле каждый кадр, даже пустое. Занято песком
+    // около двух процентов, поэтому держим прямоугольник активности: он
+    // растёт от каждого касания и сжимается, когда песок улёгся. Без этого
+    // стол крупнее окна упрётся не в отрисовку, а в физику.
+    let liveX0 = 0, liveY0 = 0, liveX1 = -1, liveY1 = -1;
+
+    function touch(x, y) {
+      if (liveX1 < liveX0) { liveX0 = liveX1 = x; liveY0 = liveY1 = y; return; }
+      if (x < liveX0) liveX0 = x; else if (x > liveX1) liveX1 = x;
+      if (y < liveY0) liveY0 = y; else if (y > liveY1) liveY1 = y;
+    }
+
+    function touchArea(x0, y0, x1, y1) {
+      touch(Math.max(1, x0 | 0), Math.max(1, y0 | 0));
+      touch(Math.min(cols - 2, Math.ceil(x1)), Math.min(rows - 2, Math.ceil(y1)));
+    }
+
     function relax() {
       const talus = params.talus, k = params.relax, hold = params.hold;
       const coh = params.cohesion;
       const mohr = params.yield === 'mc';
       const decay = 1 - params.settle;
+      if (liveX1 < liveX0) return;                 // всё улеглось, считать нечего
+      // запас в клетку: осыпание может выйти за прежнюю границу
+      const x0 = Math.max(1, liveX0 - 1), x1 = Math.min(cols - 2, liveX1 + 1);
+      const y0 = Math.max(1, liveY0 - 1), y1 = Math.min(rows - 2, liveY1 + 1);
+      let nx0 = cols, ny0 = rows, nx1 = -1, ny1 = -1;
+
       for (let pass = 0; pass < 2; pass++) {
-        for (let y = 1; y < rows - 1; y++) {
-          for (let x = 1; x < cols - 1; x++) {
+        for (let y = y0; y <= y1; y++) {
+          for (let x = x0; x <= x1; x++) {
             const i = y * cols + x;
             if (wall[i]) continue;
             const h = field[i];
             if (h < 1e-3) continue;
             const live = loose[i];
             if (live < 0.02) continue;
+            if (x < nx0) nx0 = x; if (x > nx1) nx1 = x;
+            if (y < ny0) ny0 = y; if (y > ny1) ny1 = y;
             // Порог сдвига. «Порог» замораживает весь слой тоньше сцепления.
             // «Мор-Кулон» — вклад сцепления обратно пропорционален высоте:
             // тонкий слой держит крутую стенку, толстый оплывает до откоса.
@@ -305,18 +340,22 @@
           }
         }
       }
-      for (let i = 0; i < loose.length; i++) loose[i] *= decay;
-      collapseDust();
+      // зона сжимается до того, что реально шевелилось в этом кадре
+      liveX0 = nx0; liveY0 = ny0; liveX1 = nx1; liveY1 = ny1;
+
+      for (let y = y0; y <= y1; y++)
+        for (let x = x0; x <= x1; x++) loose[y * cols + x] *= decay;
+      collapseDust(x0, y0, x1, y1);
     }
 
     // Континуум оставляет в клетках бесконечно малые остатки, и рендер честно
     // рисует каждый как отдельное зерно — поле покрывается пылью. Настоящий
     // песок дискретен: меньше зерна не бывает. Крошки уходят к полному соседу.
-    function collapseDust() {
+    function collapseDust(x0, y0, x1, y1) {
       const dust = params.dust;
       if (dust <= 0) return;
-      for (let y = 1; y < rows - 1; y++) {
-        for (let x = 1; x < cols - 1; x++) {
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
           const i = y * cols + x;
           const h = field[i];
           if (h <= 0 || h >= dust) continue;
@@ -348,6 +387,7 @@
           if (cy < 1) cy = 1; else if (cy > rows - 2) cy = rows - 2;
           field[cy * cols + cx] += params.freeMass;
           loose[cy * cols + cx] = 1;
+          touch(cx, cy);
           continue;
         }
         free.x[alive] = x; free.y[alive] = y;
