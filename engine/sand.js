@@ -56,7 +56,12 @@
       count: 0
     };
 
+    // Размер стола идёт от окна, но рисунок при этом терять нельзя: перенос
+    // идёт от левого верхнего угла, поэтому песок остаётся на месте, а стол
+    // прирастает или убывает справа и снизу. Что не поместилось — теряется,
+    // иначе некуда деть.
     function resize(nextWidthPx, nextHeightPx) {
+      const prevField = field, prevCols = cols, prevRows = rows;
       cols = Math.ceil(nextWidthPx / cell);
       rows = Math.ceil(nextHeightPx / cell);
       field = new Float32Array(cols * rows);
@@ -65,9 +70,24 @@
       wall = new Uint8Array(cols * rows);
       wallDirty = false;
       free.count = 0;
+
+      if (prevField) {
+        const w = Math.min(prevCols, cols), h = Math.min(prevRows, rows);
+        for (let y = 0; y < h; y++)
+          field.set(prevField.subarray(y * prevCols, y * prevCols + w), y * cols);
+      }
+
       engine.cols = cols;
       engine.rows = rows;
       engine.field = field;
+    }
+
+    // Перенос поля произвольного размера — для сохранений, снятых в окне
+    // другого размера: иначе рисунок пропадает при возврате на другом экране.
+    function adopt(source, sourceCols, sourceRows) {
+      const w = Math.min(sourceCols, cols), h = Math.min(sourceRows, rows);
+      for (let y = 0; y < h; y++)
+        field.set(source.subarray(y * sourceCols, y * sourceCols + w), y * cols);
     }
 
     function clear() {
@@ -347,7 +367,7 @@
     const engine = {
       params, cell, free,
       cols: 0, rows: 0, field: null,
-      resize, clear, mass, pile, pour,
+      resize, adopt, clear, mass, pile, pour,
       stampWall, blade, relax, stepFree, tick
     };
 

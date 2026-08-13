@@ -101,3 +101,30 @@ test('крошки не остаются пылью', () => {
     if (e.field[i] > 0 && e.field[i] < 0.05) dusty++;
   assert.ok(dusty < e.field.length * 0.01, `клеток с пылью: ${dusty}`);
 });
+
+test('рисунок переживает изменение размера окна', () => {
+  const e = create(600, 900);
+  e.pile(200, 300, 60, 6);
+  const before = e.mass();
+  const probeBefore = probe(e, 200, 300, 70);
+
+  e.resize(900, 1200);            // окно растянули
+  assert.ok(Math.abs(e.mass() - before) < 0.01,
+    `масса потерялась при расширении: ${before} → ${e.mass()}`);
+  assert.ok(Math.abs(probe(e, 200, 300, 70) - probeBefore) < 0.01,
+    'песок сместился относительно левого верхнего угла');
+
+  e.resize(600, 900);             // и вернули обратно
+  assert.ok(Math.abs(probe(e, 200, 300, 70) - probeBefore) < 0.01,
+    'песок не пережил возврат к прежнему размеру');
+});
+
+test('поле чужого размера переносится с обрезкой по краю', () => {
+  const e = create(600, 900);
+  const source = new Float32Array(100 * 100).fill(2);
+  e.adopt(source, 100, 100);      // источник уже поля по ширине
+  assert.ok(e.mass() > 0, 'ничего не перенеслось');
+  assert.strictEqual(e.field[0], 2, 'левый верхний угол не совпал');
+  assert.strictEqual(e.field[99 * e.cols + 99], 2, 'дальний угол источника потерян');
+  assert.strictEqual(e.field[100 * e.cols + 100], 0, 'перенос вышел за размер источника');
+});

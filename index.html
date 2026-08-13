@@ -138,6 +138,16 @@
     }
 
 
+    /* Пока стол широкий, панели по краям и контролы по центру не спорят.
+       На узком окне панель материала дотягивается до середины, поэтому
+       контролы уезжают под шапку. */
+    @media (max-width: 1180px) {
+      .tool-group {
+        top: calc(max(18px, env(safe-area-inset-top)) + 34px);
+        bottom: auto;
+      }
+    }
+
     .invite {
       position: fixed;
       z-index: 2;
@@ -746,11 +756,16 @@
       target = SandRender.createTarget(context, canvas.width, canvas.height, dpr);
     }
 
+    // Ресайз не должен стирать работу: движок переносит поле сам, стол просто
+    // прирастает или убывает справа и снизу.
+    let resizeTimer = 0;
+
     function onResize() {
       resizeCanvas();
-      // поле привязано к размеру стола, поэтому пересоздаём и насыпаем заново
-      initialize(true);
+      engine.resize(innerWidth, innerHeight);
       placeCard(toolPose.x, toolPose.y, toolAngle);
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => scheduleSave(0), 300);
     }
 
     // Стол начинается пустым: песок появляется там, где его насыпали, а не в
@@ -758,7 +773,7 @@
     function initialize(forceFresh = false) {
       engine = SandEngine.create(innerWidth, innerHeight);
       const saved = forceFresh ? null : loadState();
-      if (saved) engine.field.set(saved);
+      if (saved) engine.adopt(saved.field, saved.cols, saved.rows);
       initialMass = engine.mass();
       baseMass = initialMass;
       dirty = false;
@@ -982,11 +997,12 @@
         if (!raw) return null;
         const saved = JSON.parse(raw);
         if (saved.version !== SAVE_VERSION) return null;
-        if (saved.cols !== engine.cols || saved.rows !== engine.rows) return null;
         const packed = new Uint16Array(base64ToBytes(saved.data).buffer);
-        const out = new Float32Array(packed.length);
-        for (let i = 0; i < packed.length; i++) out[i] = packed[i] / 65535 * MAX_HEIGHT;
-        return out;
+        if (packed.length !== saved.cols * saved.rows) return null;
+        const field = new Float32Array(packed.length);
+        for (let i = 0; i < packed.length; i++) field[i] = packed[i] / 65535 * MAX_HEIGHT;
+        // размеры могли быть другими: окно меняли, экран сменился
+        return { field, cols: saved.cols, rows: saved.rows };
       } catch (error) {
         return null;
       }
