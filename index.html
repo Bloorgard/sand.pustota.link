@@ -132,7 +132,8 @@
 
     .parameter-control output {
       min-width: 26px;
-      font: inherit;
+      font-size: 10px;
+      font-variant-numeric: tabular-nums;
       text-align: left;
     }
 
@@ -152,6 +153,50 @@
         flex-direction: column;
         gap: 6px;
       }
+    }
+
+    /* Ползунки: тонкая линия и квадратный бегунок. Капсула со сплошной
+       заливкой весит визуально больше, чем значение, которое она несёт. */
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 16px;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    input[type=range]::-webkit-slider-runnable-track {
+      height: 1px;
+      background: linear-gradient(to right,
+        rgba(26, 28, 30, .85) 0 var(--fill, 50%),
+        rgba(26, 28, 30, .16) var(--fill, 50%) 100%);
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 11px;
+      height: 11px;
+      margin-top: -5px;
+      border-radius: 1px;
+      background: #1a1c1e;
+    }
+
+    input[type=range]::-moz-range-track {
+      height: 1px;
+      background: rgba(26, 28, 30, .16);
+    }
+
+    input[type=range]::-moz-range-progress {
+      height: 1px;
+      background: rgba(26, 28, 30, .85);
+    }
+
+    input[type=range]::-moz-range-thumb {
+      width: 11px;
+      height: 11px;
+      border: 0;
+      border-radius: 1px;
+      background: #1a1c1e;
     }
 
     .invite {
@@ -665,6 +710,7 @@
     applyStyle();
     bindPhysicsPanel();
     bindPanels();
+    bindRanges();
     requestAnimationFrame(tick);
 
     function applyStyle() {
@@ -675,6 +721,21 @@
 
     // Обе панели раскрыты при первом приходе: сначала показать, чем можно
     // управлять, а свернуть человек решит сам. Выбор запоминается.
+    // Заполненную часть дорожки нельзя выразить чистым CSS, поэтому долю
+    // держим в переменной и обновляем при каждом изменении.
+    function paintRange(input) {
+      const min = Number(input.min) || 0, max = Number(input.max) || 100;
+      const value = Number(input.value);
+      input.style.setProperty('--fill', ((value - min) / (max - min) * 100).toFixed(1) + '%');
+    }
+
+    function bindRanges() {
+      for (const input of document.querySelectorAll('input[type=range]')) {
+        paintRange(input);
+        input.addEventListener('input', () => paintRange(input));
+      }
+    }
+
     function bindPanels() {
       let collapsed = [];
       try { collapsed = JSON.parse(localStorage.getItem(PANELS_KEY) || '[]'); } catch (_) {}
@@ -941,6 +1002,7 @@
     function setToolAngle(value, persist = true) {
       toolAngle = clamp(Math.round(Number(value) || 0), 0, 180);
       angleInput.value = String(toolAngle);
+      paintRange(angleInput);
       angleValue.value = `${toolAngle}°`;
       angleValue.textContent = `${toolAngle}°`;
       placeCard(toolPose.x, toolPose.y, toolAngle);
@@ -952,6 +1014,7 @@
     function setToolLength(value, persist = true) {
       toolLength = clamp(Math.round(Number(value) || 20), 20, 240);
       lengthInput.value = String(toolLength);
+      paintRange(lengthInput);
       lengthValue.value = String(toolLength);
       lengthValue.textContent = String(toolLength);
       placeCard(toolPose.x, toolPose.y, toolAngle);
