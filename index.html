@@ -296,13 +296,28 @@
 
     .panel kbd {
       display: inline-grid;
+      grid-auto-flow: column;
       place-items: center;
+      gap: 1px;
       min-width: 19px;
       height: 19px;
       padding: 0 4px;
       border: 1px solid rgba(26, 28, 30, .22);
       border-radius: 4px;
       font: 500 10px/1 inherit;
+    }
+
+    /* В моноширинном ⇧ и ⌘ втискиваются в ячейку буквы и выходят вдвое ниже
+       неё. Системный шрифт рисует их в полный рост. */
+    .panel kbd i {
+      font: 12px/1 -apple-system, "SF Pro Text", system-ui, sans-serif;
+      font-style: normal;
+    }
+
+    .panel kbd.wide {
+      min-width: 44px;
+      font-size: 9px;
+      letter-spacing: .03em;
     }
 
     .panel label {
@@ -605,13 +620,13 @@
     </button>
     <div class="panel-body" id="legend-body">
       <div class="key"><span><kbd>Q</kbd><kbd>W</kbd></span> поворот</div>
-      <div class="key"><span><kbd>⇧Q</kbd><kbd>⇧W</kbd></span> шаг 45°</div>
+      <div class="key"><span><kbd><i>⇧</i>Q</kbd><kbd><i>⇧</i>W</kbd></span> шаг 45°</div>
       <div class="key"><span><kbd>S</kbd><kbd>D</kbd></span> длина</div>
       <div class="key"><span><kbd>A</kbd></span> сыпать</div>
       <div class="key"><span><kbd>X</kbd></span> очистить</div>
-      <div class="key"><span><kbd>⌘Z</kbd></span> отменить</div>
-      <div class="key"><span><kbd>␣</kbd></span> двигать стол</div>
-      <div class="key"><span><kbd>`</kbd></span> материал</div>
+      <div class="key"><span><kbd><i>⌘</i>Z</kbd></span> отменить</div>
+      <div class="key"><span><kbd class="wide">space</kbd></span> двигать стол</div>
+      <div class="key"><span><kbd>M</kbd></span> материал</div>
     </div>
   </aside>
 
@@ -796,7 +811,9 @@
         undo();
         return;
       }
-      if (event.code === 'Backquote') {
+      // M — «материал»; обратная кавычка работает по старой памяти, но в
+      // легенде её не нарисовать: это штрих высотой в пару пикселей
+      if (event.code === 'KeyM' || event.code === 'Backquote') {
         event.preventDefault();
         const toggle = physics.querySelector('.panel-toggle');
         toggle.setAttribute('aria-expanded',
