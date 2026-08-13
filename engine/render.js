@@ -41,14 +41,17 @@
   }
 
   // scale — пикселей канваса на CSS-пиксель: на ретине холст крупнее страницы,
-  // и зерно должно расти вместе с ним, иначе картинка мельчает вдвое
+  // и зерно должно расти вместе с ним, иначе картинка мельчает вдвое.
+  // viewX/viewY — левый верхний угол видимой части стола в CSS-пикселях:
+  // стол крупнее окна, и в кадр попадает только его кусок.
   function createTarget(ctx, widthPx, heightPx, scale) {
     const image = ctx.createImageData(widthPx, heightPx);
     return {
       ctx, image,
       pixels: new Uint32Array(image.data.buffer),
       width: widthPx, height: heightPx,
-      scale: scale || 1
+      scale: scale || 1,
+      viewX: 0, viewY: 0
     };
   }
 
@@ -77,14 +80,16 @@
     const nx = Math.ceil(target.width / (GRAIN * scale));
     const ny = Math.ceil(target.height / (GRAIN * scale));
     const k = GRAIN / engine.cell;
+    const offX = target.viewX / engine.cell;   // сдвиг вьюпорта в клетках
+    const offY = target.viewY / engine.cell;
     const needsSlope = styleName === 'light';
 
     for (let y = 0; y < ny; y++) {
-      const fy = y * k;
+      const fy = y * k + offY;
       const y0 = fy | 0, ty = fy - y0;
       if (y0 < 1 || y0 >= rows - 2) continue;
       for (let x = 0; x < nx; x++) {
-        const fx = x * k;
+        const fx = x * k + offX;
         const x0 = fx | 0, tx = fx - x0;
         if (x0 < 1 || x0 >= cols - 2) continue;
         const i = y0 * cols + x0;
@@ -92,7 +97,10 @@
                 + field[i + cols] * (1 - tx) * ty + field[i + cols + 1] * tx * ty;
         if (h < 0.015) continue;
         // край получается рваным, тело сплошным
-        if (h < SOLID && hash(x, y) > h / SOLID) continue;
+        // шум берётся от клетки стола, а не от места на экране: иначе при
+        // панорамировании зерно перерисовывается заново и картинка кипит
+        const gx0 = (fx * 10) | 0, gy0 = (fy * 10) | 0;
+        if (h < SOLID && hash(gx0, gy0) > h / SOLID) continue;
 
         let tone;
         if (needsSlope) {
@@ -103,15 +111,16 @@
           tone = style.tone(h, 0, 0);
         }
 
-        const jx = (hash(x + 7919, y) - 0.5) * GRAIN * 1.15;
-        const jy = (hash(x, y + 104729) - 0.5) * GRAIN * 1.15;
+        const jx = (hash(gx0 + 7919, gy0) - 0.5) * GRAIN * 1.15;
+        const jy = (hash(gx0, gy0 + 104729) - 0.5) * GRAIN * 1.15;
         put(target, (x * GRAIN + jx) * scale, (y * GRAIN + jy) * scale, shade(tone));
       }
     }
 
     const free = engine.free;
     for (let i = 0; i < free.count; i++)
-      put(target, free.x[i] * scale, free.y[i] * scale, GRAIN_DARK);
+      put(target, (free.x[i] - target.viewX) * scale,
+                  (free.y[i] - target.viewY) * scale, GRAIN_DARK);
 
     target.ctx.putImageData(target.image, 0, 0);
   }

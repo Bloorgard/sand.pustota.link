@@ -199,6 +199,9 @@
       background: #1a1c1e;
     }
 
+    body.panning #sand { cursor: grab; }
+    body.panning:active #sand { cursor: grabbing; }
+
     .invite {
       position: fixed;
       z-index: 2;
@@ -607,6 +610,7 @@
       <div class="key"><span><kbd>A</kbd></span> сыпать</div>
       <div class="key"><span><kbd>X</kbd></span> очистить</div>
       <div class="key"><span><kbd>⌘Z</kbd></span> отменить</div>
+      <div class="key"><span><kbd>␣</kbd></span> двигать стол</div>
       <div class="key"><span><kbd>`</kbd></span> материал</div>
     </div>
   </aside>
@@ -638,8 +642,13 @@
     const MAX_HEIGHT = 64.0;        // потолок упаковки: вал доходит до сорока
     const SAVE_VERSION = 3;
 
+    const STAGE = 2;        // стол вдвое больше окна по каждой стороне
     let engine = null;
     let target = null;
+    let stageWidth = 0, stageHeight = 0;
+    // левый верхний угол видимой части стола
+    const view = { x: 0, y: 0 };
+    let panning = false;
     let initialMass = 0;
     let baseMass = 0;      // масса первой раздачи: с ней сравнивается досыпанное
     let style = 'light';
@@ -777,6 +786,11 @@
     const HOTKEYS = ['KeyQ', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyX'];
 
     addEventListener('keydown', event => {
+      if (event.code === 'Space') {
+        event.preventDefault();
+        if (!panning) { panning = true; document.body.classList.add('panning'); }
+        return;
+      }
       if (event.code === 'KeyZ' && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
         undo();
@@ -800,6 +814,7 @@
       keys.add(event.code);
     });
     addEventListener('keyup', event => {
+      if (event.code === 'Space') { panning = false; document.body.classList.remove('panning'); return; }
       if (event.code === 'KeyA') scheduleCommit();
       if (!keys.delete(event.code)) return;
       // при удержании параметры не пишутся в хранилище каждый кадр —
@@ -807,7 +822,11 @@
       if (event.code === 'KeyQ' || event.code === 'KeyW') setToolAngle(toolAngle);
       if (event.code === 'KeyS' || event.code === 'KeyD') setToolLength(toolLength);
     });
-    addEventListener('blur', () => keys.clear());
+    addEventListener('blur', () => {
+      keys.clear();
+      panning = false;
+      document.body.classList.remove('panning');
+    });
 
     function snapAngle(delta) {
       const snapped = Math.round(toolAngle / 45) * 45 + delta;
@@ -819,7 +838,7 @@
       const rot = 75 * dt, grow = 260 * dt;
       if (keys.has('KeyA')) {
         if (!strokeStart) beginHistory();
-        engine.pour(toolPose.x, toolPose.y, dt);
+        engine.pour(toolPose.x + view.x, toolPose.y + view.y, dt);
         if (!baseMass) baseMass = engine.mass();
         scheduleSave(900);
         updateInvite();
@@ -845,7 +864,10 @@
 
     function onResize() {
       resizeCanvas();
-      engine.resize(innerWidth, innerHeight);
+      stageWidth = innerWidth * STAGE;
+      stageHeight = innerHeight * STAGE;
+      engine.resize(stageWidth, stageHeight);
+      clampView();
       placeCard(toolPose.x, toolPose.y, toolAngle);
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => scheduleSave(0), 300);
@@ -854,7 +876,12 @@
     // Стол начинается пустым: песок появляется там, где его насыпали, а не в
     // центре, куда потом не помещается рисунок.
     function initialize(forceFresh = false) {
-      engine = SandEngine.create(innerWidth, innerHeight);
+      stageWidth = innerWidth * STAGE;
+      stageHeight = innerHeight * STAGE;
+      engine = SandEngine.create(stageWidth, stageHeight);
+      // начинаем в середине стола: край одинаково далеко во все стороны
+      view.x = (stageWidth - innerWidth) / 2;
+      view.y = (stageHeight - innerHeight) / 2;
       const saved = forceFresh ? null : loadState();
       if (saved) engine.adopt(saved.field, saved.cols, saved.rows);
       initialMass = engine.mass();
@@ -887,7 +914,9 @@
       engine.stampWall(tool.x, tool.y, tool.px, tool.py, toolAngle, toolLength, tool.down);
       engine.tick();
 
+      target.viewX = view.x; target.viewY = view.y;
       SandRender.draw(target, engine, style);
+      drawEdges();
       drawTool();
 
       if (Math.floor(now / 800) !== Math.floor((now - elapsed) / 800)) {
@@ -962,6 +991,15 @@
       saveTimer = setTimeout(saveState, delay);
     }
 
+    function clampView() {
+      view.x = clamp(view.x, 0, Math.max(0, stageWidth - innerWidth));
+      view.y = clamp(view.y, 0, Math.max(0, stageHeight - innerHeight));
+      if (target) { target.viewX = view.x; target.viewY = view.y; }
+    }
+
+    // на столе, а не на экране: скребок живёт в координатах поля
+    function toStage(x, y) { return { x: x + view.x, y: y + view.y }; }
+
     function clampToolScreen(x, y, angle) {
       const width = toolLength;
       const height = 6;
@@ -978,6 +1016,25 @@
       const screen = clampToolScreen(x, y, angle);
       toolPose.x = screen.x;
       toolPose.y = screen.y;
+    }
+
+    // Край стола: у холста есть предел, и упереться в него нужно видеть.
+    // Рисуем только те стороны, что попали в кадр.
+    function drawEdges() {
+      const scale = target.scale;
+      const left = -view.x, top = -view.y;
+      const right = stageWidth - view.x, bottom = stageHeight - view.y;
+      context.save();
+      context.strokeStyle = 'rgba(26, 28, 30, .16)';
+      context.lineWidth = scale;
+      context.setLineDash([scale * 5, scale * 5]);
+      context.beginPath();
+      if (left >= 0) { context.moveTo(left * scale, 0); context.lineTo(left * scale, canvas.height); }
+      if (top >= 0) { context.moveTo(0, top * scale); context.lineTo(canvas.width, top * scale); }
+      if (right <= innerWidth) { context.moveTo(right * scale, 0); context.lineTo(right * scale, canvas.height); }
+      if (bottom <= innerHeight) { context.moveTo(0, bottom * scale); context.lineTo(canvas.width, bottom * scale); }
+      context.stroke();
+      context.restore();
     }
 
     // Скребок — линия на холсте, а не элемент страницы: карточка с градиентом
@@ -1066,15 +1123,24 @@
       scheduleSave(600);
     }
 
+    let panFrom = null;
+
     function onPointerDown(event) {
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       event.preventDefault();
+      if (panning) {
+        try { canvas.setPointerCapture(event.pointerId); } catch (_) {}
+        activePointer = event.pointerId;
+        panFrom = { x: event.clientX, y: event.clientY, viewX: view.x, viewY: view.y };
+        return;
+      }
       beginHistory();
       try { canvas.setPointerCapture(event.pointerId); } catch (_) {}
       activePointer = event.pointerId;
       const start = clampToolScreen(event.clientX, event.clientY, toolAngle);
-      tool.x = tool.px = start.x;
-      tool.y = tool.py = start.y;
+      const stage = toStage(start.x, start.y);
+      tool.x = tool.px = stage.x;
+      tool.y = tool.py = stage.y;
       tool.down = true;
       placeCard(start.x, start.y, toolAngle);
     }
@@ -1082,6 +1148,12 @@
     function onPointerMove(event) {
       const dragging = activePointer === event.pointerId;
       if (dragging) event.preventDefault();
+      if (panFrom && dragging) {
+        view.x = panFrom.viewX - (event.clientX - panFrom.x);
+        view.y = panFrom.viewY - (event.clientY - panFrom.y);
+        clampView();
+        return;
+      }
       // coalesced-события несут все промежуточные точки быстрого движения,
       // иначе на резком жесте скребок телепортируется
       const samples = dragging && typeof event.getCoalescedEvents === 'function'
@@ -1089,7 +1161,10 @@
       let screen = null;
       for (const sample of samples) {
         screen = clampToolScreen(sample.clientX, sample.clientY, toolAngle);
-        if (dragging) pending.push({ x: screen.x, y: screen.y });
+        if (dragging) {
+          const stage = toStage(screen.x, screen.y);
+          pending.push({ x: stage.x, y: stage.y });
+        }
       }
       if (screen) placeCard(screen.x, screen.y, toolAngle);
     }
@@ -1097,6 +1172,7 @@
     function finishPointer(event, cancelled) {
       if (activePointer !== event.pointerId) return;
       activePointer = null;
+      if (panFrom) { panFrom = null; return; }
       tool.down = false;
       scheduleCommit();
       scheduleSave(1000);
@@ -1159,7 +1235,7 @@
     }
 
     addEventListener('beforeunload', saveState);
-    window.sandDebug = { getStats, engine: () => engine, tool };
+    window.sandDebug = { getStats, engine: () => engine, tool, view };
   })();
   </script>
 </body>
